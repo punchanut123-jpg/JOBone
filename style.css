@@ -1333,8 +1333,6 @@ body {
     background: #fff;
 }
 
-
-
 .photo-info-name {
     font-size: 1rem;
     font-weight: 600;
@@ -1346,4 +1344,3 @@ body {
     color: var(--text-muted);
     margin-top: 2px;
 }
-
