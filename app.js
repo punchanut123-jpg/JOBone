@@ -19,6 +19,7 @@ let devModeActive           = false;
 let clockInterval           = null;
 let devPanelClickCount      = 0;
 let isCheckingInVeryLate    = false;
+let isAdminAuthenticated    = false; // เช็คว่าแอดมินล็อกอินผ่าน PIN หรือยัง
 
 // ── DOM References ───────────────────────────────────────────────
 const tabRegister   = document.getElementById('tab-register');
@@ -313,6 +314,12 @@ function toggleDevMode(active) {
 
 // ── Tab Navigation ───────────────────────────────────────────────
 function switchTab(tab) {
+    // ถ้าจะเข้าหน้า report และยังไม่ได้ authenticate -> เปิด PIN modal
+    if (tab === 'report' && !isAdminAuthenticated) {
+        openPinModal();
+        return;
+    }
+
     const tabs  = { register: tabRegister, checkin: tabCheckin, report: tabReport };
     const views = { register: viewRegister, checkin: viewCheckin, report: viewReport };
 
@@ -573,33 +580,20 @@ function updateTodayStatusPill(studentId) {
 function updateActionButtons() {
     if (!currentLookedUpStudent) return;
 
-    const rec = getTodayRecord(currentLookedUpStudent.studentId);
+    const rec  = getTodayRecord(currentLookedUpStudent.studentId);
     const now = getNowMinutes();
-    const CO_OPEN  = toMinutes(16, 30);
-    const CO_CLOSE = toMinutes(17,  0);
-
+    const CO_OPEN = toMinutes(16, 30);
+    const CO_CLOSE = toMinutes(17, 0);
+    
     const isCheckoutTime = (now >= CO_OPEN && now <= CO_CLOSE);
     const hasPhoto = !!currentCheckinPhoto;
 
-    if (!rec) {
-        // ยังไม่เช็คอิน -> แสดงปุ่มเช็คอิน
-        btnCheckin.classList.remove('hidden');
-        btnCheckout.classList.add('hidden');
-        btnCheckin.disabled = !hasPhoto;
-        return;
-    }
-
-    if (rec.status === 'checked_out') {
-        btnCheckin.classList.add('hidden');
-        btnCheckout.classList.remove('hidden');
+    if (rec && rec.status === 'checked_out') {
         btnCheckout.disabled = true;
         return;
     }
 
-    // เช็คอินแล้ว รอเช็คเอาท์
-    btnCheckin.classList.add('hidden');
-    btnCheckout.classList.remove('hidden');
-    const canCheckout = devModeActive || isCheckoutTime;
+    const canCheckout = rec && rec.status !== 'checked_out' && (devModeActive || isCheckoutTime);
     btnCheckout.disabled = !(canCheckout && hasPhoto);
 }
 
@@ -612,6 +606,17 @@ function openRemarkModal() {
 
 function closeRemarkModal() {
     remarkModal.classList.remove('active');
+    if (isCheckingInVeryLate) {
+        isCheckingInVeryLate = false;
+        // Reset lookup input since check-in was cancelled
+        checkinStudentId.value = '';
+        currentLookedUpStudent = null;
+        studentInfoCard.classList.add('hidden');
+        checkinPhotoSection.classList.add('hidden');
+        checkinPhotoPreviewCon.classList.add('hidden');
+        actionButtons.classList.add('hidden');
+        remarkSection.classList.add('hidden');
+    }
 }
 
 function setQuickRemark(text) {
@@ -620,19 +625,32 @@ function setQuickRemark(text) {
 
 function saveRemark() {
     const val = remarkTextarea.value.trim();
-    currentRemark = val;
-    closeRemarkModal();
-    updateRemarkUI();
-
-    if (currentLookedUpStudent) {
-        const rec = getTodayRecord(currentLookedUpStudent.studentId);
-        if (rec) {
-            rec.remark = val;
-            saveAttendance();
-            filterAttendanceRecords();
+    
+    if (isCheckingInVeryLate) {
+        if (!val) {
+            showToast('กรุณาระบุเหตุผลการมาสาย', 'error');
+            return;
         }
+        // Save check-in with verylate status
+        saveAutoCheckinRecord(currentLookedUpStudent, 'verylate', val);
+        isCheckingInVeryLate = false;
+        closeRemarkModal();
+    } else {
+        // Normal remark editing
+        currentRemark = val;
+        closeRemarkModal();
+        updateRemarkUI();
+        
+        if (currentLookedUpStudent) {
+            const rec = getTodayRecord(currentLookedUpStudent.studentId);
+            if (rec) {
+                rec.remark = val;
+                saveAttendance();
+                filterAttendanceRecords();
+            }
+        }
+        if (val) showToast('บันทึกหมายเหตุแล้ว ✓', 'success');
     }
-    if (val) showToast('บันทึกหมายเหตุแล้ว ✓', 'success');
 }
 function updateRemarkUI() {
     if (currentRemark) {
@@ -649,9 +667,13 @@ function updateRemarkUI() {
 
 // ── Check-in Logic ───────────────────────────────────────────────
 function triggerAutoCheckin(student) {
-    const currentMin = getNowMinutes();
-    const CI_OPEN     = toMinutes(7,  0);
-    const CI_LATE     = toMinutes(8,  0);
+    const now = new Date();
+    const hh = now.getHours();
+    const mm = now.getMinutes();
+    
+    const currentMin = hh * 60 + mm;
+    const CI_OPEN = toMinutes(7, 0);
+    const CI_LATE = toMinutes(8, 0);
     const CI_VERYLATE = toMinutes(8, 30);
 
     if (!devModeActive && currentMin < CI_OPEN) {
@@ -659,30 +681,24 @@ function triggerAutoCheckin(student) {
         return;
     }
 
-    // แสดง UI ถ่ายรูปและปุ่มเช็คอินก่อนเสมอ (แก้ Bug รูปหาย)
-    checkinPhotoSection.classList.remove('hidden');
-    actionButtons.classList.remove('hidden');
-    btnCheckin.classList.remove('hidden');
-    btnCheckout.classList.add('hidden');
-
-    if (!devModeActive && currentMin > CI_VERYLATE) {
-        isCheckingInVeryLate = true;
-        remarkSection.classList.remove('hidden');
-        showToast('⚠️ คุณมาสายมาก กรุณาระบุเหตุผลและถ่ายรูปก่อนกดเช็คอิน', 'warning', 4000);
-    } else if (!devModeActive && currentMin > CI_LATE) {
-        remarkSection.classList.remove('hidden');
-        showToast('⚠️ อยู่ในช่วงมาสาย กรุณาถ่ายรูปและกดเช็คอิน', 'warning', 3500);
+    if (devModeActive || (currentMin >= CI_OPEN && currentMin <= CI_LATE)) {
+        // 07:00 - 08:00 -> ontime
+        saveAutoCheckinRecord(student, 'ontime', '');
+    } else if (currentMin > CI_LATE && currentMin <= CI_VERYLATE) {
+        // 08:01 - 08:30 -> late
+        saveAutoCheckinRecord(student, 'late', '');
     } else {
-        showToast('✅ กรุณาถ่ายรูปยืนยันตัวตนและกดเช็คอิน', 'info', 3000);
+        // หลัง 08:30 -> verylate
+        isCheckingInVeryLate = true;
+        currentLookedUpStudent = student;
+        openRemarkModal();
     }
-
-    updateActionButtons();
 }
 
-function saveAutoCheckinRecord(student, status, remark, photo) {
+function saveAutoCheckinRecord(student, status, remark) {
     const now = new Date();
     const timeStr = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false });
-
+    
     const record = {
         id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
         studentId: student.studentId,
@@ -692,7 +708,7 @@ function saveAutoCheckinRecord(student, status, remark, photo) {
         checkOut: '',
         status: status,
         remark: remark,
-        checkInPhoto: photo || '',
+        checkInPhoto: '',
         checkOutPhoto: ''
     };
 
@@ -713,48 +729,18 @@ function saveAutoCheckinRecord(student, status, remark, photo) {
         toastType = 'error';
     }
 
-    showToast(`✅ บันทึกเวลาเข้างาน ${timeStr} น. — สถานะ: ${thaiStatus}`, toastType, 4500);
+    showToast(`✅ บันทึกเวลาเข้างานอัตโนมัติ ${timeStr} น. — สถานะ: ${thaiStatus}`, toastType, 4500);
+    autoSaveToExcel();
 
-    // ซ่อนปุ่มเช็คอิน แสดงปุ่มเช็คเอาท์แทน
-    btnCheckin.classList.add('hidden');
-    btnCheckout.classList.remove('hidden');
+    // Allow check-out workflow if they need to check out later
+    checkinPhotoSection.classList.remove('hidden');
+    remarkSection.classList.remove('hidden');
+    actionButtons.classList.remove('hidden');
     updateActionButtons();
 }
 
 function handleCheckIn() {
-    if (!currentLookedUpStudent) return;
-
-    if (!currentCheckinPhoto) {
-        showToast('กรุณาถ่ายรูปยืนยันตัวตนก่อนเช็คอิน', 'error');
-        return;
-    }
-
-    const currentMin  = getNowMinutes();
-    const CI_LATE     = toMinutes(8,  0);
-    const CI_VERYLATE = toMinutes(8, 30);
-
-    let status = 'ontime';
-    if (!devModeActive) {
-        if (currentMin > CI_VERYLATE) status = 'verylate';
-        else if (currentMin > CI_LATE) status = 'late';
-    }
-
-    if (status === 'verylate' && !currentRemark) {
-        showToast('กรุณาระบุเหตุผลการมาสายก่อนเช็คอิน', 'error');
-        openRemarkModal();
-        return;
-    }
-
-    isCheckingInVeryLate = false;
-    saveAutoCheckinRecord(currentLookedUpStudent, status, currentRemark, currentCheckinPhoto);
-
-    // รีเซ็ตรูปและ remark หลังเช็คอินสำเร็จ
-    currentCheckinPhoto = null;
-    checkinPhotoPreviewCon.classList.add('hidden');
-    checkinPhotoPreview.src = '';
-    btnCheckinCamera.querySelector('span').textContent = 'ถ่ายรูปยืนยัน';
-    currentRemark = '';
-    updateRemarkUI();
+    // Hidden in UI, auto check-in is used
 }
 
 // ── Check-out Logic ──────────────────────────────────────────────
@@ -801,6 +787,8 @@ function handleCheckOut() {
     updateDashboard();
     filterAttendanceRecords();
     showToast(`🔵 บันทึกเวลาออกงาน ${timeStr} น. เรียบร้อยแล้ว`, 'success', 4500);
+
+    autoSaveToExcel();
 }
 
 function resetCheckinState() {
@@ -1004,6 +992,7 @@ function closePhotoModal() {
 
 // ── Admin Actions ────────────────────────────────────────────────
 function clearAttendanceOnly() {
+    if (!isAdminAuthenticated) { openPinModal(); return; }
     if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูลการลงเวลาทั้งหมด?')) return;
     dbAttendance = [];
     localStorage.removeItem('attendanceRecords');
@@ -1014,6 +1003,7 @@ function clearAttendanceOnly() {
 }
 
 function clearStudentsOnly() {
+    if (!isAdminAuthenticated) { openPinModal(); return; }
     if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูลนักศึกษาทั้งหมด?')) return;
     dbStudents = [];
     localStorage.removeItem('students');
@@ -1025,6 +1015,7 @@ function clearStudentsOnly() {
 }
 
 function clearAllData() {
+    if (!isAdminAuthenticated) { openPinModal(); return; }
     if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูลทั้งหมดในระบบ?')) return;
     dbStudents = [];
     dbAttendance = [];
@@ -1093,4 +1084,122 @@ function exportToExcel() {
 
     XLSX.writeFile(wb, filename);
     showToast('ดาวน์โหลดไฟล์ Excel สำเร็จ ✓', 'success');
+}
+
+function autoSaveToExcel() {
+    if (typeof XLSX === 'undefined') return;
+    try {
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.aoa_to_sheet(buildExcelData());
+        ws['!cols'] = [
+            { wch: 6 }, { wch: 24 }, { wch: 14 }, { wch: 14 },
+            { wch: 10 }, { wch: 10 }, { wch: 16 }, { wch: 24 },
+            { wch: 10 }, { wch: 10 }
+        ];
+        XLSX.utils.book_append_sheet(wb, ws, 'รายงานการลงเวลา');
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const d = String(now.getDate()).padStart(2, '0');
+        const hh = String(now.getHours()).padStart(2, '0');
+        const mm = String(now.getMinutes()).padStart(2, '0');
+        const filename = `attendance_${y}-${m}-${d}_${hh}-${mm}.xlsx`;
+        XLSX.writeFile(wb, filename);
+        showToast('💾 บันทึกไฟล์ Excel อัตโนมัติแล้ว', 'info', 2500);
+    } catch (e) {
+        console.warn('Auto-save Excel failed:', e);
+    }
+}
+
+// ── Admin PIN System (Logic by เจมส์, UI by คลอด) ──────────────
+function verifyAdminPIN(inputPIN) {
+    const savedPIN = localStorage.getItem('admin_pin') || '1234';
+    if (inputPIN === savedPIN) {
+        isAdminAuthenticated = true;
+        showToast('🔓 เข้าสู่ระบบแอดมินสำเร็จ', 'success');
+        return true;
+    } else {
+        showToast('❌ รหัส PIN ไม่ถูกต้อง กรุณาลองใหม่', 'error');
+        return false;
+    }
+}
+
+function changeAdminPIN(oldPIN, newPIN) {
+    const savedPIN = localStorage.getItem('admin_pin') || '1234';
+    if (oldPIN !== savedPIN) {
+        showToast('❌ รหัสเดิมไม่ถูกต้อง', 'error');
+        return false;
+    }
+    if (!newPIN || newPIN.length < 4) {
+        showToast('⚠️ รหัสใหม่ต้องมีอย่างน้อย 4 ตัวอักษร/ตัวเลข', 'warning');
+        return false;
+    }
+    localStorage.setItem('admin_pin', newPIN);
+    showToast('🔑 เปลี่ยนรหัส PIN แอดมินเรียบร้อยแล้ว ✓', 'success');
+    return true;
+}
+
+// ── PIN Modal UI Functions (by คลอด) ────────────────────────────
+function openPinModal(onSuccess) {
+    const modal = document.getElementById('pin-modal');
+    const input = document.getElementById('pin-input');
+    const dots  = document.querySelectorAll('.pin-dot');
+    if (!modal) return;
+
+    // รีเซ็ต
+    input.value = '';
+    dots.forEach(d => d.classList.remove('filled'));
+    document.getElementById('pin-error').classList.add('hidden');
+    document.getElementById('pin-tab-target').value = 'report';
+
+    modal.classList.add('active');
+    setTimeout(() => input.focus(), 200);
+}
+
+function closePinModal() {
+    document.getElementById('pin-modal').classList.remove('active');
+    document.getElementById('pin-input').value = '';
+    document.querySelectorAll('.pin-dot').forEach(d => d.classList.remove('filled'));
+}
+
+function onPinInput(e) {
+    const val  = e.target.value.replace(/\D/g, '').slice(0, 6);
+    e.target.value = val;
+    const dots = document.querySelectorAll('.pin-dot');
+    dots.forEach((d, i) => d.classList.toggle('filled', i < val.length));
+    document.getElementById('pin-error').classList.add('hidden');
+    if (val.length >= 4) submitPin();
+}
+
+function submitPin() {
+    const val = document.getElementById('pin-input').value;
+    if (verifyAdminPIN(val)) {
+        closePinModal();
+        const target = document.getElementById('pin-tab-target').value || 'report';
+        switchTab(target);
+    } else {
+        document.getElementById('pin-error').classList.remove('hidden');
+        document.getElementById('pin-input').value = '';
+        document.querySelectorAll('.pin-dot').forEach(d => d.classList.remove('filled'));
+    }
+}
+
+function logoutAdmin() {
+    isAdminAuthenticated = false;
+    switchTab('checkin');
+    showToast('🔒 ออกจากระบบแอดมินแล้ว', 'info');
+}
+
+function appendPin(digit) {
+    const input = document.getElementById('pin-input');
+    if (input.value.length < 6) {
+        input.value += digit;
+        onPinInput({ target: input });
+    }
+}
+
+function clearPin() {
+    const input = document.getElementById('pin-input');
+    input.value = input.value.slice(0, -1);
+    onPinInput({ target: input });
 }
