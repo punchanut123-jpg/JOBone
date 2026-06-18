@@ -1531,7 +1531,7 @@ body {
     background-position: center;
     background-repeat: no-repeat;
     background-size: 60% auto;
-    opacity: 0.05;
+    opacity: 0.12;
     z-index: -1;
     pointer-events: none;
 }
