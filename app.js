@@ -747,6 +747,7 @@ function saveAutoCheckinRecord(student, status, remark) {
     const now = new Date();
     const timeStr = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false });
     
+    // ✅ [เจมส์ แก้ไข]: บันทึกรูปภาพขาเข้าจริง ไม่ปล่อยเป็นค่าว่างแล้ว
     const record = {
         id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
         studentId: student.studentId,
@@ -756,7 +757,7 @@ function saveAutoCheckinRecord(student, status, remark) {
         checkOut: '',
         status: status,
         remark: remark,
-        checkInPhoto: '',
+        checkInPhoto: currentCheckinPhoto || '', 
         checkOutPhoto: ''
     };
 
@@ -778,9 +779,10 @@ function saveAutoCheckinRecord(student, status, remark) {
     }
 
     showToast(`✅ บันทึกเวลาเข้างานอัตโนมัติ ${timeStr} น. — สถานะ: ${thaiStatus}`, toastType, 4500);
-    autoSaveToExcel();
+    
+    // ✅ [เจมส์ แก้ไข]: คอมเมนต์ปิด autoSaveToExcel() ขาเข้าออก เพื่อแก้บั๊กไฟล์เด้งดาวน์โหลดรัวๆ
+    // autoSaveToExcel();
 
-    // Allow check-out workflow if they need to check out later
     checkinPhotoSection.classList.remove('hidden');
     remarkSection.classList.remove('hidden');
     actionButtons.classList.remove('hidden');
@@ -976,7 +978,9 @@ function renderAttendanceTable(data = dbAttendance) {
             <td>
                 <div style="display:flex;align-items:center;gap:8px;">
                     ${photo ? `<img src="${photo}" class="table-photo" alt="">` : ''}
-                    <span style="font-weight:500">${rec.name || rec.username}</span>
+                    <span style="font-weight:500; color:var(--accent-color); cursor:pointer;" onclick="openIndividualStatsModal('${rec.studentId}')" title="คลิกเพื่อดูสถิติรายบุคคล">
+                        ${rec.name || rec.username} 🔍
+                    </span>
                 </div>
             </td>
             <td style="font-family:'Inter',monospace;font-size:0.78rem;color:var(--text-muted)">${rec.studentId}</td>
@@ -1250,4 +1254,128 @@ function clearPin() {
     const input = document.getElementById('pin-input');
     input.value = input.value.slice(0, -1);
     onPinInput({ target: input });
+}
+
+// 💾 ฟังก์ชันสำหรับ Export ข้อมูลทั้งหมดออกเป็นไฟล์ JSON (Backup)
+function backupDataToJSON() {
+    if (dbStudents.length === 0 && dbAttendance.length === 0) {
+        showToast('⚠️ ไม่มีข้อมูลในระบบสำหรับสำรองข้อมูล', 'warning');
+        return;
+    }
+    const backupData = {
+        version: "1.0",
+        backupAt: new Date().toLocaleString('th-TH'),
+        students: dbStudents,
+        attendance: dbAttendance
+    };
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData, null, 2));
+    const downloadAnchor = document.createElement('a');
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", `attendance_backup_${dateStr}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+    showToast('💾 สำรองข้อมูลเป็นไฟล์ JSON สำเร็จ ✓', 'success');
+}
+
+// 📂 ฟังก์ชันกู้คืนข้อมูลจากไฟล์ JSON (Restore)
+function restoreDataFromJSON(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const importedData = JSON.parse(e.target.result);
+            if (!importedData.students || !importedData.attendance) {
+                showToast('❌ รูปแบบไฟล์สำรองไม่ถูกต้อง ไม่สามารถกู้คืนได้', 'error');
+                return;
+            }
+            if (!confirm('⚠️ การกู้คืนข้อมูลจะเขียนทับข้อมูลปัจจุบันทั้งหมดในเครื่องนี้ คุณต้องการดำเนินการต่อใช่หรือไม่?')) {
+                event.target.value = '';
+                return;
+            }
+            dbStudents = importedData.students;
+            dbAttendance = importedData.attendance;
+            localStorage.setItem('students', JSON.stringify(dbStudents));
+            localStorage.setItem('attendanceRecords', JSON.stringify(dbAttendance));
+            updateRecordCount();
+            updateDashboard();
+            filterAttendanceRecords();
+            showToast('🔄 กู้คืนข้อมูลระบบทั้งหมดเรียบร้อยแล้ว ✓', 'success');
+        } catch (err) {
+            console.error(err);
+            showToast('❌ เกิดข้อผิดพลาดในการอ่านไฟล์ JSON', 'error');
+        }
+        event.target.value = '';
+    };
+    reader.readAsText(file);
+}
+
+// 🔍 ฟังก์ชันดึงประวัติการลงเวลาและสรุปสถิติเฉพาะบุคคล
+function getStudentStatsAndHistory(studentId) {
+    const personalHistory = dbAttendance.filter(record => record.studentId === studentId);
+    let countOnTime = 0, countLate = 0, countVeryLate = 0;
+    personalHistory.forEach(record => {
+        if (record.status === 'ontime') countOnTime++;
+        else if (record.status === 'late') countLate++;
+        else if (record.status === 'verylate') countVeryLate++;
+    });
+    return {
+        studentId: studentId,
+        totalRecords: personalHistory.length,
+        stats: { onTime: countOnTime, late: countLate, veryLate: countVeryLate },
+        history: personalHistory
+    };
+}
+
+// 📱 ฟังก์ชันเปิด Modal แสดงสถิติและประวัติรายบุคคล
+function openIndividualStatsModal(studentId) {
+    const student = dbStudents.find(s => s.studentId === studentId);
+    if (!student) return;
+    const data = getStudentStatsAndHistory(studentId);
+    const total = data.totalRecords || 1;
+    const pctOnTime = Math.round((data.stats.onTime / total) * 100);
+    const pctLate = Math.round((data.stats.late / total) * 100);
+    const pctVeryLate = Math.round((data.stats.veryLate / total) * 100);
+
+    document.getElementById('ind-modal-photo').src = student.photo;
+    document.getElementById('ind-modal-name').textContent = student.username;
+    document.getElementById('ind-modal-id').textContent = `รหัสนักศึกษา: ${student.studentId}`;
+    document.getElementById('ind-total-count').textContent = `${data.totalRecords} ครั้ง`;
+
+    document.getElementById('bar-ontime').style.width = `${pctOnTime}%`;
+    document.getElementById('val-ontime-pct').textContent = `${data.stats.onTime} ครั้ง (${pctOnTime}%)`;
+    document.getElementById('bar-late').style.width = `${pctLate}%`;
+    document.getElementById('val-late-pct').textContent = `${data.stats.late} ครั้ง (${pctLate}%)`;
+    document.getElementById('bar-verylate').style.width = `${pctVeryLate}%`;
+    document.getElementById('val-verylate-pct').textContent = `${data.stats.veryLate} ครั้ง (${pctVeryLate}%)`;
+
+    const tbody = document.getElementById('ind-history-tbody');
+    tbody.innerHTML = '';
+    if (data.history.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--text-muted)">ยังไม่มีประวัติการลงเวลา</td></tr>`;
+    } else {
+        data.history.forEach((rec, idx) => {
+            let statusText = 'ตรงเวลา', statusClass = 'tbl-ontime';
+            if (rec.status === 'late') { statusText = 'มาสาย'; statusClass = 'tbl-late'; }
+            else if (rec.status === 'verylate') { statusText = 'สายมาก'; statusClass = 'tbl-verylate'; }
+            else if (rec.status === 'checked_out') { statusText = 'ออกงานแล้ว'; statusClass = 'tbl-checkout'; }
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td style="text-align:center">${idx + 1}</td>
+                <td>${formatDisplayDate(rec.date)}</td>
+                <td style="font-weight:500">${rec.checkIn || '—'} / ${rec.checkOut || '—'}</td>
+                <td><span class="tbl-status ${statusClass}">${statusText}</span></td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+    document.getElementById('individual-modal').classList.add('active');
+}
+
+// 📱 ฟังก์ชันปิด Modal สถิติรายบุคคล
+function closeIndividualModal() {
+    document.getElementById('individual-modal').classList.remove('active');
 }

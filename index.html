@@ -278,6 +278,15 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
                         ล้างข้อมูลทั้งหมด
                     </button>
+                    <button type="button" class="btn-admin btn-admin-warn" onclick="backupDataToJSON()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        สำรองข้อมูล (JSON)
+                    </button>
+                    <label class="btn-admin btn-admin-warn" style="display: inline-flex; align-items: center; cursor: pointer; margin: 0;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13" style="margin-right:6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                        กู้คืนข้อมูล (JSON)
+                        <input type="file" accept=".json" onchange="restoreDataFromJSON(event)" style="display: none;">
+                    </label>
                 </div>
             </div>
 
@@ -417,6 +426,70 @@
 
 <!-- Toast -->
 <div id="toast-container" class="toast-container"></div>
+
+<div id="individual-modal" class="modal-overlay" onclick="closeIndividualModal()">
+    <div class="modal-content" onclick="event.stopPropagation()" style="max-width: 460px;">
+        <div class="modal-header">
+            <h3>สถิติและประวัติการลงเวลารายบุคคล</h3>
+            <button class="modal-close" onclick="closeIndividualModal()">✕</button>
+        </div>
+        <div style="padding: 20px; display: flex; flex-direction: column; gap: 16px; max-height: 80vh; overflow-y: auto;">
+            <div style="display: flex; align-items: center; gap: 16px; background: #f8fafc; padding: 12px; border-radius: 16px; border: 1px solid var(--border-color);">
+                <img id="ind-modal-photo" src="" alt="" style="width: 70px; height: 70px; border-radius: 12px; object-fit: cover; border: 2px solid var(--primary-color);">
+                <div>
+                    <h4 id="ind-modal-name" style="font-size: 1.1rem; font-weight:600;">-</h4>
+                    <p id="ind-modal-id" style="font-size: 0.85rem; color: var(--text-muted); margin-top: 2px;">-</p>
+                    <p style="font-size: 0.85rem; font-weight:500; margin-top: 4px;">ลงเวลาทั้งหมด: <span id="ind-total-count" style="color: var(--accent-color); font-weight:700;">0 ครั้ง</span></p>
+                </div>
+            </div>
+            <div>
+                <h5 style="font-size: 0.9rem; font-weight:600; margin-bottom: 10px;">📊 สรุปสถิติการมาเรียน</h5>
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <div>
+                        <div style="display: flex; justify-content: space-between; font-size: 0.78rem; margin-bottom: 3px;">
+                            <span>🟢 ตรงเวลา</span><span id="val-ontime-pct" style="font-weight:600;">0 ครั้ง (0%)</span>
+                        </div>
+                        <div style="background: #e2e8f0; height: 10px; border-radius: 5px; overflow: hidden;">
+                            <div id="bar-ontime" style="background: var(--success-color); height: 100%; width: 0%; transition: width 0.5s ease-out;"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div style="display: flex; justify-content: space-between; font-size: 0.78rem; margin-bottom: 3px;">
+                            <span>🟡 มาสาย</span><span id="val-late-pct" style="font-weight:600;">0 ครั้ง (0%)</span>
+                        </div>
+                        <div style="background: #e2e8f0; height: 10px; border-radius: 5px; overflow: hidden;">
+                            <div id="bar-late" style="background: var(--warning-color); height: 100%; width: 0%; transition: width 0.5s ease-out;"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div style="display: flex; justify-content: space-between; font-size: 0.78rem; margin-bottom: 3px;">
+                            <span>🚨 สายมาก</span><span id="val-verylate-pct" style="font-weight:600;">0 ครั้ง (0%)</span>
+                        </div>
+                        <div style="background: #e2e8f0; height: 10px; border-radius: 5px; overflow: hidden;">
+                            <div id="bar-verylate" style="background: var(--danger-color); height: 100%; width: 0%; transition: width 0.5s ease-out;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <h5 style="font-size: 0.9rem; font-weight:600; margin-bottom: 8px;">📅 ประวัติการลงเวลาย้อนหลัง</h5>
+                <div style="border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; max-height: 200px; overflow-y: auto;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem; text-align: left;">
+                        <thead style="background: #f1f5f9; position: sticky; top:0;">
+                            <tr>
+                                <th style="padding: 8px; text-align:center;">#</th>
+                                <th style="padding: 8px;">วันที่</th>
+                                <th style="padding: 8px;">เวลา (เข้า/ออก)</th>
+                                <th style="padding: 8px;">สถานะ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ind-history-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
 <script src="app.js"></script>
 </body>
