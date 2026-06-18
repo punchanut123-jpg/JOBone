@@ -978,7 +978,7 @@ function renderAttendanceTable(data = dbAttendance) {
             <td>
                 <div style="display:flex;align-items:center;gap:8px;">
                     ${photo ? `<img src="${photo}" class="table-photo" alt="">` : ''}
-                    <span style="font-weight:500; color:var(--accent-color); cursor:pointer;" onclick="openIndividualStatsModal('${rec.studentId}')" title="คลิกเพื่อดูสถิติรายบุคคล">
+                    <span style="font-weight:500; color:var(--accent-color); cursor:pointer; white-space: nowrap;" onclick="openIndividualStatsModal('${rec.studentId}')" title="คลิกเพื่อดูสถิติรายบุคคล">
                         ${rec.name || rec.username} 🔍
                     </span>
                 </div>

@@ -1540,3 +1540,57 @@ body {
 body.modal-open {
     overflow: hidden;
 }
+
+/* =====================================================
+   ⚙️ PREMIUM RESPONSIVE FOR MOBILE (เจมส์ จัดชุดใหญ่ให้)
+   ===================================================== */
+   
+/* สำหรับหน้าจอคอมพิวเตอร์และแท็บเล็ต: ให้เรียงหน้ากระดาน 5 การ์ดสวยๆ */
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+    width: 100%;
+    margin-bottom: 8px;
+}
+
+/* 📱 เมื่อเปิดใช้งานผ่านหน้าจอมือถือ (ความกว้างต่ำกว่า 480px) */
+@media (max-width: 480px) {
+    /* ลด Padding ของกล่องรายงานลง เพื่อเพิ่มพื้นที่เล่นให้ตาราง */
+    .admin-panel {
+        padding: 16px 12px;
+    }
+
+    /* ปรับการ์ดแดชบอร์ดสถิติให้แบ่งสัดส่วนเป็นแถวละ 3 และ แถวละ 2 ตัวเลขจะได้ไม่เบียดกัน */
+    .dashboard-grid {
+        grid-template-columns: repeat(6, 1fr);
+        gap: 6px;
+    }
+    .stat-card {
+        grid-column: span 2; /* แถวแรกขึ้น 3 การ์ด */
+        padding: 8px 4px;
+    }
+    /* สองการ์ดอันตรายด้านหลัง ขยายให้กว้างขึ้นและตัดลงมาอยู่แถวสองคู่กัน */
+    .stat-card:nth-child(4),
+    .stat-card:nth-child(5) {
+        grid-column: span 3; /* แถวสองขึ้น 2 การ์ด */
+    }
+    .stat-value {
+        font-size: 1.25rem; /* ลดขนาดตัวเลขลงนิดนึงให้พอดีจอโทรศัพท์ */
+    }
+    .stat-label {
+        font-size: 0.65rem;
+    }
+
+    /* ปรับแถบค้นหาและตัวกรองให้เรียงต่อกันเป็นแนวตั้ง (ของเดิมต่อกันแนวนอนจนหลุดขอบมือถือ) */
+    .filter-bar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 6px;
+    }
+    .filter-search-wrap, 
+    .filter-input {
+        width: 100%;
+        flex: none;
+    }
+}
