@@ -747,7 +747,7 @@ function saveAutoCheckinRecord(student, status, remark) {
     const now = new Date();
     const timeStr = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false });
     
-    // ✅ [เจมส์ แก้ไข]: บันทึกรูปภาพขาเข้าจริง ไม่ปล่อยเป็นค่าว่างแล้ว
+    // 🛠️ [แก้ไขจุดที่ 1]: บันทึกรูปภาพขาเข้าจริง (currentCheckinPhoto) จากกล้องลง LocalStorage
     const record = {
         id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
         studentId: student.studentId,
@@ -780,7 +780,7 @@ function saveAutoCheckinRecord(student, status, remark) {
 
     showToast(`✅ บันทึกเวลาเข้างานอัตโนมัติ ${timeStr} น. — สถานะ: ${thaiStatus}`, toastType, 4500);
     
-    // ✅ [เจมส์ แก้ไข]: คอมเมนต์ปิด autoSaveToExcel() ขาเข้าออก เพื่อแก้บั๊กไฟล์เด้งดาวน์โหลดรัวๆ
+    // 🛠️ [แก้ไขจุดที่ 2]: ปิด autoSaveToExcel() ในฝั่งขาเข้า เพื่อหยุดบั๊กไฟล์ Excel เด้งดาวน์โหลดซ้ำๆ
     // autoSaveToExcel();
 
     checkinPhotoSection.classList.remove('hidden');
@@ -1372,10 +1372,11 @@ function openIndividualStatsModal(studentId) {
             tbody.appendChild(tr);
         });
     }
+    document.body.classList.add('modal-open'); // ล็อกสกอร์ลพื้นหลังตัวหลัก
     document.getElementById('individual-modal').classList.add('active');
 }
 
-// 📱 ฟังก์ชันปิด Modal สถิติรายบุคคล
 function closeIndividualModal() {
+    document.body.classList.remove('modal-open');
     document.getElementById('individual-modal').classList.remove('active');
 }

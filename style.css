@@ -1535,3 +1535,8 @@ body {
     z-index: -1;
     pointer-events: none;
 }
+
+/* Scroll lock when modal is active */
+body.modal-open {
+    overflow: hidden;
+}
