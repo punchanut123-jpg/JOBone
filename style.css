@@ -1514,3 +1514,24 @@ body {
     color: #fff;
     border-color: var(--danger-color);
 }
+
+/* Watermark styles */
+.mobile-frame,
+.admin-panel {
+    position: relative;
+    isolation: isolate;
+}
+
+.mobile-frame::before,
+.admin-panel::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-image: url('logo.jpg');
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: 60% auto;
+    opacity: 0.05;
+    z-index: -1;
+    pointer-events: none;
+}
