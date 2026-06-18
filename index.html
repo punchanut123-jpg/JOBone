@@ -383,8 +383,10 @@
             </div>
 
             <!-- Hidden actual input -->
+            <label for="pin-input" class="sr-only">รหัส PIN</label>
             <input type="password" id="pin-input" class="pin-hidden-input"
                 inputmode="numeric" maxlength="6" autocomplete="off"
+                title="รหัส PIN" placeholder="รหัส PIN"
                 oninput="onPinInput(event)" onkeydown="if(event.key==='Enter') submitPin()">
             <input type="hidden" id="pin-tab-target" value="report">
 

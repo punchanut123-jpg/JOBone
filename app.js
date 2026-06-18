@@ -391,16 +391,62 @@ function stopWebcamStream() {
     webcamEl.srcObject = null;
 }
 
+// ── Image Compression Engine ─────────────────────────────────────
+/**
+ * บีบอัดรูปภาพให้ไม่เกิน maxKB KB และ maxSize px
+ * คืนค่า Promise<base64string>
+ */
+function compressImage(src, maxKB = 80, maxSize = 480) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let { width, height } = img;
+
+            // ย่อขนาดถ้าใหญ่เกิน
+            if (width > maxSize || height > maxSize) {
+                if (width > height) {
+                    height = Math.round((height / width) * maxSize);
+                    width  = maxSize;
+                } else {
+                    width  = Math.round((width / height) * maxSize);
+                    height = maxSize;
+                }
+            }
+
+            canvas.width  = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            // ลด quality จนไม่เกิน maxKB
+            let quality = 0.82;
+            let result  = canvas.toDataURL('image/jpeg', quality);
+
+            while (result.length > maxKB * 1024 * 1.37 && quality > 0.2) {
+                quality -= 0.08;
+                result = canvas.toDataURL('image/jpeg', quality);
+            }
+
+            resolve(result);
+        };
+        img.src = src;
+    });
+}
+
 function capturePhoto() {
     if (!streamInstance) return;
     const ctx = photoCanvas.getContext('2d');
     photoCanvas.width  = webcamEl.videoWidth  || 640;
     photoCanvas.height = webcamEl.videoHeight || 480;
     ctx.drawImage(webcamEl, 0, 0, photoCanvas.width, photoCanvas.height);
-    const b64 = photoCanvas.toDataURL('image/jpeg', 0.82);
-    displayPhotoPreview(b64, cameraContext);
+    const raw = photoCanvas.toDataURL('image/jpeg', 0.92);
     closeCameraModal();
-    showToast('ถ่ายภาพเรียบร้อยแล้ว ✓', 'success');
+
+    compressImage(raw).then(compressed => {
+        displayPhotoPreview(compressed, cameraContext);
+        showToast('ถ่ายภาพเรียบร้อยแล้ว ✓', 'success');
+    });
 }
 
 function handleFallbackFile(event) {
@@ -408,9 +454,11 @@ function handleFallbackFile(event) {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (e) => {
-        displayPhotoPreview(e.target.result, cameraContext);
         closeCameraModal();
-        showToast('อัปโหลดรูปภาพสำเร็จ ✓', 'success');
+        compressImage(e.target.result).then(compressed => {
+            displayPhotoPreview(compressed, cameraContext);
+            showToast('อัปโหลดรูปภาพสำเร็จ ✓', 'success');
+        });
     };
     reader.readAsDataURL(file);
 }
