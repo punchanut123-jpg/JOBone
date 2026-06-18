@@ -573,20 +573,33 @@ function updateTodayStatusPill(studentId) {
 function updateActionButtons() {
     if (!currentLookedUpStudent) return;
 
-    const rec  = getTodayRecord(currentLookedUpStudent.studentId);
+    const rec = getTodayRecord(currentLookedUpStudent.studentId);
     const now = getNowMinutes();
-    const CO_OPEN = toMinutes(16, 30);
-    const CO_CLOSE = toMinutes(17, 0);
-    
+    const CO_OPEN  = toMinutes(16, 30);
+    const CO_CLOSE = toMinutes(17,  0);
+
     const isCheckoutTime = (now >= CO_OPEN && now <= CO_CLOSE);
     const hasPhoto = !!currentCheckinPhoto;
 
-    if (rec && rec.status === 'checked_out') {
+    if (!rec) {
+        // ยังไม่เช็คอิน -> แสดงปุ่มเช็คอิน
+        btnCheckin.classList.remove('hidden');
+        btnCheckout.classList.add('hidden');
+        btnCheckin.disabled = !hasPhoto;
+        return;
+    }
+
+    if (rec.status === 'checked_out') {
+        btnCheckin.classList.add('hidden');
+        btnCheckout.classList.remove('hidden');
         btnCheckout.disabled = true;
         return;
     }
 
-    const canCheckout = rec && rec.status !== 'checked_out' && (devModeActive || isCheckoutTime);
+    // เช็คอินแล้ว รอเช็คเอาท์
+    btnCheckin.classList.add('hidden');
+    btnCheckout.classList.remove('hidden');
+    const canCheckout = devModeActive || isCheckoutTime;
     btnCheckout.disabled = !(canCheckout && hasPhoto);
 }
 
@@ -599,17 +612,6 @@ function openRemarkModal() {
 
 function closeRemarkModal() {
     remarkModal.classList.remove('active');
-    if (isCheckingInVeryLate) {
-        isCheckingInVeryLate = false;
-        // Reset lookup input since check-in was cancelled
-        checkinStudentId.value = '';
-        currentLookedUpStudent = null;
-        studentInfoCard.classList.add('hidden');
-        checkinPhotoSection.classList.add('hidden');
-        checkinPhotoPreviewCon.classList.add('hidden');
-        actionButtons.classList.add('hidden');
-        remarkSection.classList.add('hidden');
-    }
 }
 
 function setQuickRemark(text) {
@@ -618,32 +620,19 @@ function setQuickRemark(text) {
 
 function saveRemark() {
     const val = remarkTextarea.value.trim();
-    
-    if (isCheckingInVeryLate) {
-        if (!val) {
-            showToast('กรุณาระบุเหตุผลการมาสาย', 'error');
-            return;
+    currentRemark = val;
+    closeRemarkModal();
+    updateRemarkUI();
+
+    if (currentLookedUpStudent) {
+        const rec = getTodayRecord(currentLookedUpStudent.studentId);
+        if (rec) {
+            rec.remark = val;
+            saveAttendance();
+            filterAttendanceRecords();
         }
-        // Save check-in with verylate status
-        saveAutoCheckinRecord(currentLookedUpStudent, 'verylate', val);
-        isCheckingInVeryLate = false;
-        closeRemarkModal();
-    } else {
-        // Normal remark editing
-        currentRemark = val;
-        closeRemarkModal();
-        updateRemarkUI();
-        
-        if (currentLookedUpStudent) {
-            const rec = getTodayRecord(currentLookedUpStudent.studentId);
-            if (rec) {
-                rec.remark = val;
-                saveAttendance();
-                filterAttendanceRecords();
-            }
-        }
-        if (val) showToast('บันทึกหมายเหตุแล้ว ✓', 'success');
     }
+    if (val) showToast('บันทึกหมายเหตุแล้ว ✓', 'success');
 }
 function updateRemarkUI() {
     if (currentRemark) {
@@ -660,13 +649,9 @@ function updateRemarkUI() {
 
 // ── Check-in Logic ───────────────────────────────────────────────
 function triggerAutoCheckin(student) {
-    const now = new Date();
-    const hh = now.getHours();
-    const mm = now.getMinutes();
-    
-    const currentMin = hh * 60 + mm;
-    const CI_OPEN = toMinutes(7, 0);
-    const CI_LATE = toMinutes(8, 0);
+    const currentMin = getNowMinutes();
+    const CI_OPEN     = toMinutes(7,  0);
+    const CI_LATE     = toMinutes(8,  0);
     const CI_VERYLATE = toMinutes(8, 30);
 
     if (!devModeActive && currentMin < CI_OPEN) {
@@ -674,24 +659,30 @@ function triggerAutoCheckin(student) {
         return;
     }
 
-    if (devModeActive || (currentMin >= CI_OPEN && currentMin <= CI_LATE)) {
-        // 07:00 - 08:00 -> ontime
-        saveAutoCheckinRecord(student, 'ontime', '');
-    } else if (currentMin > CI_LATE && currentMin <= CI_VERYLATE) {
-        // 08:01 - 08:30 -> late
-        saveAutoCheckinRecord(student, 'late', '');
-    } else {
-        // หลัง 08:30 -> verylate
+    // แสดง UI ถ่ายรูปและปุ่มเช็คอินก่อนเสมอ (แก้ Bug รูปหาย)
+    checkinPhotoSection.classList.remove('hidden');
+    actionButtons.classList.remove('hidden');
+    btnCheckin.classList.remove('hidden');
+    btnCheckout.classList.add('hidden');
+
+    if (!devModeActive && currentMin > CI_VERYLATE) {
         isCheckingInVeryLate = true;
-        currentLookedUpStudent = student;
-        openRemarkModal();
+        remarkSection.classList.remove('hidden');
+        showToast('⚠️ คุณมาสายมาก กรุณาระบุเหตุผลและถ่ายรูปก่อนกดเช็คอิน', 'warning', 4000);
+    } else if (!devModeActive && currentMin > CI_LATE) {
+        remarkSection.classList.remove('hidden');
+        showToast('⚠️ อยู่ในช่วงมาสาย กรุณาถ่ายรูปและกดเช็คอิน', 'warning', 3500);
+    } else {
+        showToast('✅ กรุณาถ่ายรูปยืนยันตัวตนและกดเช็คอิน', 'info', 3000);
     }
+
+    updateActionButtons();
 }
 
-function saveAutoCheckinRecord(student, status, remark) {
+function saveAutoCheckinRecord(student, status, remark, photo) {
     const now = new Date();
     const timeStr = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false });
-    
+
     const record = {
         id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
         studentId: student.studentId,
@@ -701,7 +692,7 @@ function saveAutoCheckinRecord(student, status, remark) {
         checkOut: '',
         status: status,
         remark: remark,
-        checkInPhoto: '',
+        checkInPhoto: photo || '',
         checkOutPhoto: ''
     };
 
@@ -722,18 +713,48 @@ function saveAutoCheckinRecord(student, status, remark) {
         toastType = 'error';
     }
 
-    showToast(`✅ บันทึกเวลาเข้างานอัตโนมัติ ${timeStr} น. — สถานะ: ${thaiStatus}`, toastType, 4500);
-    autoSaveToExcel();
+    showToast(`✅ บันทึกเวลาเข้างาน ${timeStr} น. — สถานะ: ${thaiStatus}`, toastType, 4500);
 
-    // Allow check-out workflow if they need to check out later
-    checkinPhotoSection.classList.remove('hidden');
-    remarkSection.classList.remove('hidden');
-    actionButtons.classList.remove('hidden');
+    // ซ่อนปุ่มเช็คอิน แสดงปุ่มเช็คเอาท์แทน
+    btnCheckin.classList.add('hidden');
+    btnCheckout.classList.remove('hidden');
     updateActionButtons();
 }
 
 function handleCheckIn() {
-    // Hidden in UI, auto check-in is used
+    if (!currentLookedUpStudent) return;
+
+    if (!currentCheckinPhoto) {
+        showToast('กรุณาถ่ายรูปยืนยันตัวตนก่อนเช็คอิน', 'error');
+        return;
+    }
+
+    const currentMin  = getNowMinutes();
+    const CI_LATE     = toMinutes(8,  0);
+    const CI_VERYLATE = toMinutes(8, 30);
+
+    let status = 'ontime';
+    if (!devModeActive) {
+        if (currentMin > CI_VERYLATE) status = 'verylate';
+        else if (currentMin > CI_LATE) status = 'late';
+    }
+
+    if (status === 'verylate' && !currentRemark) {
+        showToast('กรุณาระบุเหตุผลการมาสายก่อนเช็คอิน', 'error');
+        openRemarkModal();
+        return;
+    }
+
+    isCheckingInVeryLate = false;
+    saveAutoCheckinRecord(currentLookedUpStudent, status, currentRemark, currentCheckinPhoto);
+
+    // รีเซ็ตรูปและ remark หลังเช็คอินสำเร็จ
+    currentCheckinPhoto = null;
+    checkinPhotoPreviewCon.classList.add('hidden');
+    checkinPhotoPreview.src = '';
+    btnCheckinCamera.querySelector('span').textContent = 'ถ่ายรูปยืนยัน';
+    currentRemark = '';
+    updateRemarkUI();
 }
 
 // ── Check-out Logic ──────────────────────────────────────────────
@@ -780,8 +801,6 @@ function handleCheckOut() {
     updateDashboard();
     filterAttendanceRecords();
     showToast(`🔵 บันทึกเวลาออกงาน ${timeStr} น. เรียบร้อยแล้ว`, 'success', 4500);
-
-    autoSaveToExcel();
 }
 
 function resetCheckinState() {
@@ -1074,29 +1093,4 @@ function exportToExcel() {
 
     XLSX.writeFile(wb, filename);
     showToast('ดาวน์โหลดไฟล์ Excel สำเร็จ ✓', 'success');
-}
-
-function autoSaveToExcel() {
-    if (typeof XLSX === 'undefined') return;
-    try {
-        const wb = XLSX.utils.book_new();
-        const ws = XLSX.utils.aoa_to_sheet(buildExcelData());
-        ws['!cols'] = [
-            { wch: 6 }, { wch: 24 }, { wch: 14 }, { wch: 14 },
-            { wch: 10 }, { wch: 10 }, { wch: 16 }, { wch: 24 },
-            { wch: 10 }, { wch: 10 }
-        ];
-        XLSX.utils.book_append_sheet(wb, ws, 'รายงานการลงเวลา');
-        const now = new Date();
-        const y = now.getFullYear();
-        const m = String(now.getMonth() + 1).padStart(2, '0');
-        const d = String(now.getDate()).padStart(2, '0');
-        const hh = String(now.getHours()).padStart(2, '0');
-        const mm = String(now.getMinutes()).padStart(2, '0');
-        const filename = `attendance_${y}-${m}-${d}_${hh}-${mm}.xlsx`;
-        XLSX.writeFile(wb, filename);
-        showToast('💾 บันทึกไฟล์ Excel อัตโนมัติแล้ว', 'info', 2500);
-    } catch (e) {
-        console.warn('Auto-save Excel failed:', e);
-    }
 }
