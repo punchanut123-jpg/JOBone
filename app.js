@@ -30,6 +30,20 @@ let timeConfig = {
     coClose: '17:00'
 };
 
+// 🌐 ส่วนกำหนดค่าเชื่อมต่อคลาวด์ Firebase Firestore (เจมส์ จัดเตรียมโครงสร้างให้)
+const firebaseConfig = {
+    apiKey: "YOUR_API_KEY_HERE",
+    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT_ID.appspot.com",
+    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+    appId: "YOUR_APP_ID"
+};
+
+// เริ่มต้นระบบฐานข้อมูลออนไลน์
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
 // ── DOM References ───────────────────────────────────────────────
 const tabRegister   = document.getElementById('tab-register');
 const tabCheckin    = document.getElementById('tab-checkin');
@@ -88,58 +102,46 @@ const remarkModal       = document.getElementById('remark-modal');
 const remarkTextarea    = document.getElementById('remark-textarea');
 
 // ── Init ─────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('test') === 'true') {
-        localStorage.setItem('students', JSON.stringify([
-            {"id":"1","username":"สมชาย รักดี","studentId":"65000001","photo":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==","registeredAt":"11/06/2569 08:00"},
-            {"id":"2","username":"สมหญิง มุ่งมั่น","studentId":"65000002","photo":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==","registeredAt":"11/06/2569 08:05"}
-        ]));
-        localStorage.setItem('attendanceRecords', JSON.stringify([
-            {
-                "id": "1001",
-                "studentId": "65000001",
-                "username": "สมชาย รักดี",
-                "date": new Date().toISOString().slice(0,10),
-                "attendanceType": "ontime",
-                "status": "checked_out",
-                "checkInTime": "07:30",
-                "checkOutTime": "16:45",
-                "remark": "",
-                "checkInPhoto":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
-                "checkOutPhoto":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
-                "createdAt": Date.now() - 3600000
-            },
-            {
-                "id": "1002",
-                "studentId": "65000002",
-                "username": "สมหญิง มุ่งมั่น",
-                "date": new Date().toISOString().slice(0,10),
-                "attendanceType": "late",
-                "status": "pending",
-                "checkInTime": "08:15",
-                "checkOutTime": "",
-                "remark": "รถติดมาก",
-                "checkInPhoto":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
-                "checkOutPhoto":"",
-                "createdAt": Date.now()
-            }
-        ]));
+document.addEventListener('DOMContentLoaded', async () => {
+    showToast('🌐 กำลังเชื่อมต่อฐานข้อมูลออนไลน์คณะ IT...', 'info', 2000);
+
+    try {
+        // 1. โหลดการตั้งค่าช่วงเวลางานและรหัส PIN จากคลาวด์
+        const configDoc = await db.collection('config').doc('settings').get();
+        if (configDoc.exists) {
+            const remoteData = configDoc.data();
+            if (remoteData.timeConfig) timeConfig = remoteData.timeConfig;
+            if (remoteData.admin_pin) localStorage.setItem('admin_pin', remoteData.admin_pin);
+        } else {
+            // หากยังไม่มี Document ในคลาวด์ ให้สร้างค่าเริ่มต้นทิ้งไว้
+            await db.collection('config').doc('settings').set({ timeConfig, admin_pin: '1234' });
+        }
+        loadTimeSettingsUI();
+
+        // 2. ดึงข้อมูลนักศึกษาและประวัติเวลาทำงานทั้งหมดจากคลาวด์
+        await syncDataFromFirestore();
+
+        // 3. ระบบซิงค์ข้อมูลเก่าจาก LocalStorage ขึ้นคลาวด์อัตโนมัติ (Migration Engine)
+        await migrateLocalDataToCloud();
+
+    } catch (error) {
+        console.error('Firebase load failed:', error);
+        showToast('❌ เชื่อมต่อฐานข้อมูลคลาวด์ล้มเหลว ทำงานในโหมด Offline สำรอง', 'error', 5000);
+
+        // โหมดสำรองออฟไลน์ — ดึงจากแคชในเครื่อง
+        const savedConfig = localStorage.getItem('timeConfig');
+        if (savedConfig) timeConfig = JSON.parse(savedConfig);
+        loadTimeSettingsUI();
+        dbStudents   = JSON.parse(localStorage.getItem('students') || '[]');
+        dbAttendance = JSON.parse(localStorage.getItem('attendanceRecords') || '[]');
     }
-    // อ่านค่าช่วงเวลาที่เคยบันทึกไว้ในเครื่อง
-    const savedConfig = localStorage.getItem('timeConfig');
-    if (savedConfig) {
-        timeConfig = JSON.parse(savedConfig);
-    }
-    loadTimeSettingsUI(); // โหลดเวลาเข้ากล่อง Input ทันที
-    
-    migrateKeysIfNeeded();
+
     updateRecordCount();
     updateDashboard();
     filterAttendanceRecords();
     startClock();
 
-    // Triple-click on clock to reveal dev panel
+    // ตัวแผงลับสำหรับนักพัฒนา (triple-click นาฬิกา)
     document.getElementById('clock-time').addEventListener('click', () => {
         devPanelClickCount++;
         if (devPanelClickCount >= 3) {
@@ -150,6 +152,18 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => { devPanelClickCount = 0; }, 1500);
     });
 });
+
+// ── ดึงข้อมูลทั้งหมดจาก Firestore เข้า RAM ─────────────────────
+async function syncDataFromFirestore() {
+    const studentSnap = await db.collection('students').get();
+    dbStudents = studentSnap.docs.map(doc => doc.data());
+
+    const attendanceSnap = await db.collection('attendance').orderBy('date', 'desc').get();
+    dbAttendance = attendanceSnap.docs.map(doc => ({
+        ...doc.data(),
+        _docId: doc.id  // เก็บ Firestore document ID ไว้สำหรับอ้างอิงตอน update checkout
+    }));
+}
 
 // ── Migration Logic ──────────────────────────────────────────────
 function migrateKeysIfNeeded() {
@@ -333,8 +347,7 @@ function toggleDevMode(active) {
 }
 
 // ── Tab Navigation ───────────────────────────────────────────────
-function switchTab(tab) {
-    // ถ้าจะเข้าหน้า report และยังไม่ได้ authenticate -> เปิด PIN modal
+async function switchTab(tab) {
     if (tab === 'report' && !isAdminAuthenticated) {
         openPinModal();
         return;
@@ -350,9 +363,14 @@ function switchTab(tab) {
     views[tab].classList.add('active');
 
     if (tab === 'report') {
+        try {
+            // ซิงค์ดึงข้อมูลสด ๆ จากคลาวด์ก่อนเปิดหน้ารายงาน
+            await syncDataFromFirestore();
+        } catch(e) { console.error('Refresh report failed:', e); }
+
         filterAttendanceRecords();
         updateDashboard();
-        loadTimeSettingsUI(); // ดึงค่าเวลาล่าสุดมาเคลียร์หน้ารายงานแอดมินให้ถูกต้อง
+        loadTimeSettingsUI();
     }
 }
 
@@ -517,7 +535,7 @@ function deletePhoto(context) {
 }
 
 // ── Registration ─────────────────────────────────────────────────
-function handleRegister(event) {
+async function handleRegister(event) {
     event.preventDefault();
 
     const username  = document.getElementById('username').value.trim();
@@ -541,14 +559,22 @@ function handleRegister(event) {
         registeredAt: new Date().toLocaleString('th-TH', { hour12: false })
     };
 
-    dbStudents.unshift(record);
-    saveStudents();
-    document.getElementById('registration-form').reset();
-    deletePhoto('register');
-    updateRecordCount();
-    updateDashboard();
-    showToast(`ลงทะเบียน "${username}" สำเร็จ ✓`, 'success');
-    setTimeout(() => switchTab('checkin'), 1400);
+    try {
+        // บันทึกขึ้น Firestore โดยใช้ studentId เป็น document key
+        await db.collection('students').doc(studentId).set(record);
+        dbStudents.unshift(record);
+        localStorage.setItem('students', JSON.stringify(dbStudents)); // สำรองโลคอลเผื่อออฟไลน์
+
+        document.getElementById('registration-form').reset();
+        deletePhoto('register');
+        updateRecordCount();
+        updateDashboard();
+        showToast(`ลงทะเบียน "${username}" ขึ้นระบบคลาวด์สำเร็จ ✓`, 'success');
+        setTimeout(() => switchTab('checkin'), 1400);
+    } catch (err) {
+        console.error(err);
+        showToast('❌ ไม่สามารถบันทึกข้อมูลลงฐานข้อมูลออนไลน์ได้', 'error');
+    }
 }
 
 function saveStudents() {
@@ -761,13 +787,11 @@ function triggerAutoCheckin(student) {
     }
 }
 
-function saveAutoCheckinRecord(student, status, remark) {
+async function saveAutoCheckinRecord(student, status, remark) {
     const now = new Date();
     const timeStr = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false });
-    
-    // 🛠️ [แก้ไขจุดที่ 1]: บันทึกรูปภาพขาเข้าจริง (currentCheckinPhoto) จากกล้องลง LocalStorage
+
     const record = {
-        id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
         studentId: student.studentId,
         name: student.username,
         date: getTodayDateStr(),
@@ -775,36 +799,36 @@ function saveAutoCheckinRecord(student, status, remark) {
         checkOut: '',
         status: status,
         remark: remark,
-        checkInPhoto: currentCheckinPhoto || '', 
+        checkInPhoto: currentCheckinPhoto || '',
         checkOutPhoto: ''
     };
 
-    dbAttendance.unshift(record);
-    saveAttendance();
+    try {
+        // เพิ่ม document ใหม่เข้า Firestore และรับ document ID กลับมา
+        const docRef = await db.collection('attendance').add(record);
+        record._docId = docRef.id;
 
-    updateTodayStatusPill(student.studentId);
-    updateDashboard();
-    filterAttendanceRecords();
+        dbAttendance.unshift(record);
+        localStorage.setItem('attendanceRecords', JSON.stringify(dbAttendance));
 
-    let thaiStatus = 'ตรงเวลา';
-    let toastType = 'success';
-    if (status === 'late') {
-        thaiStatus = 'มาสาย';
-        toastType = 'warning';
-    } else if (status === 'verylate') {
-        thaiStatus = 'สายมาก';
-        toastType = 'error';
+        updateTodayStatusPill(student.studentId);
+        updateDashboard();
+        filterAttendanceRecords();
+
+        let thaiStatus = 'ตรงเวลา'; let toastType = 'success';
+        if (status === 'late')     { thaiStatus = 'มาสาย';  toastType = 'warning'; }
+        else if (status === 'verylate') { thaiStatus = 'สายมาก'; toastType = 'error'; }
+
+        showToast(`✅ บันทึกเวลาเข้างานออนไลน์เรียบร้อย ${timeStr} น. — สถานะ: ${thaiStatus}`, toastType, 4500);
+
+        checkinPhotoSection.classList.remove('hidden');
+        remarkSection.classList.remove('hidden');
+        actionButtons.classList.remove('hidden');
+        updateActionButtons();
+    } catch(err) {
+        console.error(err);
+        showToast('❌ เกิดข้อผิดพลาดในการบันทึกเวลาเข้างานลงคลาวด์', 'error');
     }
-
-    showToast(`✅ บันทึกเวลาเข้างานอัตโนมัติ ${timeStr} น. — สถานะ: ${thaiStatus}`, toastType, 4500);
-    
-    // 🛠️ [แก้ไขจุดที่ 2]: ปิด autoSaveToExcel() ในฝั่งขาเข้า เพื่อหยุดบั๊กไฟล์ Excel เด้งดาวน์โหลดซ้ำๆ
-    // autoSaveToExcel();
-
-    checkinPhotoSection.classList.remove('hidden');
-    remarkSection.classList.remove('hidden');
-    actionButtons.classList.remove('hidden');
-    updateActionButtons();
 }
 
 function handleCheckIn() {
@@ -812,51 +836,58 @@ function handleCheckIn() {
 }
 
 // ── Check-out Logic ──────────────────────────────────────────────
-function handleCheckOut() {
+async function handleCheckOut() {
     if (!currentLookedUpStudent) return;
 
     const now = getNowMinutes();
-    const CO_OPEN = strToMinutes(timeConfig.coOpen);
+    const CO_OPEN  = strToMinutes(timeConfig.coOpen);
     const CO_CLOSE = strToMinutes(timeConfig.coClose);
     const isCheckoutTime = (now >= CO_OPEN && now <= CO_CLOSE);
 
     if (!devModeActive && !isCheckoutTime) {
         showToast(`ไม่อยู่ในช่วงเวลาลงเวลาออกงาน (${timeConfig.coOpen} – ${timeConfig.coClose} น.)`, 'error'); return;
     }
-
     if (!currentCheckinPhoto) {
         showToast('กรุณาถ่ายรูปยืนยันตัวตนก่อนลงเวลาออกงาน', 'error'); return;
     }
 
     const rec = getTodayRecord(currentLookedUpStudent.studentId);
-    if (!rec) {
-        showToast('ยังไม่ได้ลงเวลาเข้างานวันนี้', 'error'); return;
-    }
-    if (rec.checkOut || rec.status === 'checked_out') {
-        showToast('คุณได้ลงเวลาออกงานวันนี้แล้ว', 'warning'); return;
-    }
+    if (!rec)                                    { showToast('ยังไม่ได้ลงเวลาเข้างานวันนี้', 'error'); return; }
+    if (rec.checkOut || rec.status === 'checked_out') { showToast('คุณได้ลงเวลาออกงานวันนี้แล้ว', 'warning'); return; }
 
-    const timeNow = new Date();
-    const timeStr = timeNow.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false });
-
+    const timeStr = new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false });
     const idx = dbAttendance.findIndex(r => r.studentId === rec.studentId && r.date === rec.date);
-    if (idx !== -1) {
-        dbAttendance[idx].checkOut  = timeStr;
-        dbAttendance[idx].checkOutPhoto = currentCheckinPhoto;
-        dbAttendance[idx].status        = 'checked_out';
-        if (currentRemark && !dbAttendance[idx].remark) {
-            dbAttendance[idx].remark = currentRemark;
+
+    if (idx !== -1 && dbAttendance[idx]._docId) {
+        const docId = dbAttendance[idx]._docId;
+        const cloudUpdate = {
+            checkOut: timeStr,
+            checkOutPhoto: currentCheckinPhoto,
+            status: 'checked_out'
+        };
+        if (currentRemark && !dbAttendance[idx].remark) cloudUpdate.remark = currentRemark;
+
+        try {
+            // อัปเดตเอกสาร Firestore เดิมโดยอ้างอิง document ID
+            await db.collection('attendance').doc(docId).update(cloudUpdate);
+
+            dbAttendance[idx].checkOut     = timeStr;
+            dbAttendance[idx].checkOutPhoto = currentCheckinPhoto;
+            dbAttendance[idx].status        = 'checked_out';
+            if (cloudUpdate.remark) dbAttendance[idx].remark = currentRemark;
+
+            localStorage.setItem('attendanceRecords', JSON.stringify(dbAttendance));
+            updateTodayStatusPill(currentLookedUpStudent.studentId);
+            resetCheckinState();
+            updateDashboard();
+            filterAttendanceRecords();
+            showToast(`🔵 บันทึกเวลาออกงานออนไลน์สำเร็จ ${timeStr} น.`, 'success', 4500);
+            autoSaveToExcel();
+        } catch(err) {
+            console.error(err);
+            showToast('❌ ไม่สามารถส่งเวลาออกงานขึ้นระบบคลาวด์ได้', 'error');
         }
     }
-
-    saveAttendance();
-    updateTodayStatusPill(currentLookedUpStudent.studentId);
-    resetCheckinState();
-    updateDashboard();
-    filterAttendanceRecords();
-    showToast(`🔵 บันทึกเวลาออกงาน ${timeStr} น. เรียบร้อยแล้ว`, 'success', 4500);
-
-    autoSaveToExcel();
 }
 
 function resetCheckinState() {
@@ -1061,42 +1092,76 @@ function closePhotoModal() {
 }
 
 // ── Admin Actions ────────────────────────────────────────────────
-function clearAttendanceOnly() {
+async function clearAttendanceOnly() {
     if (!isAdminAuthenticated) { openPinModal(); return; }
-    if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูลการลงเวลาทั้งหมด?')) return;
-    dbAttendance = [];
-    localStorage.removeItem('attendanceRecords');
-    localStorage.removeItem('attendance_records');
-    updateDashboard();
-    filterAttendanceRecords();
-    showToast('ล้างข้อมูลการลงเวลาแล้ว', 'success');
+    if (!confirm('⚠️ แอดมินแน่ใจไหม? ข้อมูลประวัติลงเวลาบนคลาวด์ทั้งหมดจะถูกลบถาวร!')) return;
+
+    try {
+        const snap = await db.collection('attendance').get();
+        const batch = db.batch();
+        snap.docs.forEach(doc => batch.delete(doc.ref));
+        await batch.commit();
+
+        dbAttendance = [];
+        localStorage.removeItem('attendanceRecords');
+        localStorage.removeItem('attendance_records');
+        updateDashboard();
+        filterAttendanceRecords();
+        showToast('🗑️ ล้างประวัติการทำงานบนคลาวด์เรียบร้อยแล้ว', 'success');
+    } catch(e) {
+        console.error(e);
+        showToast('❌ ไม่สามารถเคลียร์ข้อมูลออนไลน์ได้', 'error');
+    }
 }
 
-function clearStudentsOnly() {
+async function clearStudentsOnly() {
     if (!isAdminAuthenticated) { openPinModal(); return; }
     if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูลนักศึกษาทั้งหมด?')) return;
-    dbStudents = [];
-    localStorage.removeItem('students');
-    localStorage.removeItem('student_records');
-    updateRecordCount();
-    updateDashboard();
-    filterAttendanceRecords();
-    showToast('ล้างข้อมูลนักศึกษาแล้ว', 'success');
+
+    try {
+        const snap = await db.collection('students').get();
+        const batch = db.batch();
+        snap.docs.forEach(doc => batch.delete(doc.ref));
+        await batch.commit();
+
+        dbStudents = [];
+        localStorage.removeItem('students');
+        localStorage.removeItem('student_records');
+        updateRecordCount();
+        updateDashboard();
+        filterAttendanceRecords();
+        showToast('ล้างข้อมูลนักศึกษาบนคลาวด์แล้ว', 'success');
+    } catch(e) {
+        console.error(e);
+        showToast('❌ ไม่สามารถเคลียร์ข้อมูลนักศึกษาออนไลน์ได้', 'error');
+    }
 }
 
-function clearAllData() {
+async function clearAllData() {
     if (!isAdminAuthenticated) { openPinModal(); return; }
     if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูลทั้งหมดในระบบ?')) return;
-    dbStudents = [];
-    dbAttendance = [];
-    localStorage.removeItem('students');
-    localStorage.removeItem('student_records');
-    localStorage.removeItem('attendanceRecords');
-    localStorage.removeItem('attendance_records');
-    updateRecordCount();
-    updateDashboard();
-    filterAttendanceRecords();
-    showToast('ล้างข้อมูลทั้งหมดในระบบเรียบร้อยแล้ว', 'success');
+
+    try {
+        const [aSnap, sSnap] = await Promise.all([
+            db.collection('attendance').get(),
+            db.collection('students').get()
+        ]);
+        const batch = db.batch();
+        aSnap.docs.forEach(doc => batch.delete(doc.ref));
+        sSnap.docs.forEach(doc => batch.delete(doc.ref));
+        await batch.commit();
+
+        dbStudents = []; dbAttendance = [];
+        localStorage.removeItem('students');
+        localStorage.removeItem('student_records');
+        localStorage.removeItem('attendanceRecords');
+        localStorage.removeItem('attendance_records');
+        updateRecordCount(); updateDashboard(); filterAttendanceRecords();
+        showToast('ล้างข้อมูลทั้งหมดในระบบคลาวด์เรียบร้อยแล้ว', 'success');
+    } catch(e) {
+        console.error(e);
+        showToast('❌ ไม่สามารถเคลียร์ข้อมูลทั้งหมดออนไลน์ได้', 'error');
+    }
 }
 
 // ── Excel Export ─────────────────────────────────────────────────
@@ -1204,8 +1269,11 @@ function changeAdminPIN(oldPIN, newPIN) {
         showToast('⚠️ รหัสใหม่ต้องมีอย่างน้อย 4 ตัวอักษร/ตัวเลข', 'warning');
         return false;
     }
+    // บันทึกทั้งบน Firestore คลาวด์และ localStorage สำรอง
+    db.collection('config').doc('settings').set({ admin_pin: newPIN }, { merge: true })
+        .then(() => { showToast('🔑 เปลี่ยนรหัส PIN แอดมินออนไลน์เรียบร้อยแล้ว ✓', 'success'); })
+        .catch(() => { showToast('❌ บันทึกรหัสใหม่ลงคลาวด์ล้มเหลว', 'error'); });
     localStorage.setItem('admin_pin', newPIN);
-    showToast('🔑 เปลี่ยนรหัส PIN แอดมินเรียบร้อยแล้ว ✓', 'success');
     return true;
 }
 
@@ -1414,39 +1482,37 @@ function loadTimeSettingsUI() {
     if (cfgCoClose) cfgCoClose.value = timeConfig.coClose;
 }
 
-// ⚙️ ฟังก์ชันตรวจสอบและเซฟค่าเวลาใหม่ลง LocalStorage
-function saveTimeSettings() {
+// ⚙️ บันทึกการตั้งค่าช่วงเวลาขึ้นคลาวด์
+async function saveTimeSettings() {
     if (!isAdminAuthenticated) { openPinModal(); return; }
-    
-    const ciOpen = document.getElementById('cfg-ci-open').value;
-    const ciOntime = document.getElementById('cfg-ci-ontime').value;
-    const ciClose = document.getElementById('cfg-ci-close').value;
-    const coOpen = document.getElementById('cfg-co-open').value;
-    const coClose = document.getElementById('cfg-co-close').value;
 
-    // ระบบป้องกันความปลอดภัยตรวจสอบความสมเหตุสมผลของเวลา (Validation)
+    const ciOpen   = document.getElementById('cfg-ci-open').value;
+    const ciOntime = document.getElementById('cfg-ci-ontime').value;
+    const ciClose  = document.getElementById('cfg-ci-close').value;
+    const coOpen   = document.getElementById('cfg-co-open').value;
+    const coClose  = document.getElementById('cfg-co-close').value;
+
     if (strToMinutes(ciOpen) >= strToMinutes(ciOntime)) {
-        showToast('❌ ข้อผิดพลาด: เวลาเปิดรับเข้างาน ต้องน้อยกว่า เวลาสิ้นสุดตรงเวลา', 'error');
-        return;
+        showToast('❌ เวลาเปิดรับเข้างาน ต้องน้อยกว่า เวลาสิ้นสุดตรงเวลา', 'error'); return;
     }
     if (strToMinutes(ciOntime) >= strToMinutes(ciClose)) {
-        showToast('❌ ข้อผิดพลาด: เวลาสิ้นสุดตรงเวลา ต้องน้อยกว่า เวลาปิดรับเข้างาน', 'error');
-        return;
+        showToast('❌ เวลาสิ้นสุดตรงเวลา ต้องน้อยกว่า เวลาปิดรับเข้างาน', 'error'); return;
     }
     if (strToMinutes(coOpen) >= strToMinutes(coClose)) {
-        showToast('❌ ข้อผิดพลาด: เวลาเปิดออกงาน ตอนเย็น ต้องน้อยกว่า เวลาปิดรับออกงาน', 'error');
-        return;
+        showToast('❌ เวลาเปิดออกงานตอนเย็น ต้องน้อยกว่า เวลาปิดรับออกงาน', 'error'); return;
     }
 
-    // ทำการเซฟข้อมูลมัดก้อน
     timeConfig = { ciOpen, ciOntime, ciClose, coOpen, coClose };
-    localStorage.setItem('timeConfig', JSON.stringify(timeConfig));
-    
-    showToast('⚙️ บันทึกการตั้งค่าช่วงเวลาลงเวลาชุดใหม่สำเร็จ ✓', 'success');
-    
-    // สั่งรีเฟรชอัปเดตหน้าแสดงผลหลักทันที
-    const now = new Date();
-    updateTimeWindowUI(now);
+
+    try {
+        await db.collection('config').doc('settings').set({ timeConfig }, { merge: true });
+        localStorage.setItem('timeConfig', JSON.stringify(timeConfig));
+        showToast('⚙️ บันทึกการตั้งค่าช่วงเวลาขึ้นระบบคลาวด์สำเร็จ ✓', 'success');
+        updateTimeWindowUI(new Date());
+    } catch(e) {
+        console.error(e);
+        showToast('❌ ไม่สามารถบันทึกค่าลงคลาวด์ได้', 'error');
+    }
 }
 
 // ── Change PIN UI Functions (เจมส์ เพิ่มเติมเพื่อผูกฟังก์ชันหลังบ้าน) ───
@@ -1484,5 +1550,23 @@ function submitChangePin() {
     // เรียกฟังก์ชันหลักหลังบ้านที่มีอยู่แล้วเพื่อตรวจสอบและเซฟค่า
     if (changeAdminPIN(oldPin, newPin)) {
         closeChangePinModal();
+    }
+}
+
+// 📦 ย้ายข้อมูลเก่าจาก LocalStorage ขึ้น Firestore (ทำงานครั้งเดียวตอนเปิดเว็บ)
+async function migrateLocalDataToCloud() {
+    const localStudents = JSON.parse(localStorage.getItem('students') || '[]');
+    if (localStudents.length > 0 && dbStudents.length === 0) {
+        showToast('🔄 พบข้อมูลเก่าในเครื่อง กำลังดันขึ้นคลาวด์...', 'info', 2500);
+        for (const s of localStudents) {
+            await db.collection('students').doc(s.studentId).set(s, { merge: true });
+        }
+        const localAttendance = JSON.parse(localStorage.getItem('attendanceRecords') || '[]');
+        for (const a of localAttendance) {
+            const { _docId, ...data } = a;
+            await db.collection('attendance').add(data);
+        }
+        await syncDataFromFirestore();
+        showToast('✅ ย้ายข้อมูลเดิมขึ้นคลาวด์สำเร็จแล้ว', 'success');
     }
 }
