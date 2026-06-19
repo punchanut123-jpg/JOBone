@@ -21,6 +21,15 @@ let devPanelClickCount      = 0;
 let isCheckingInVeryLate    = false;
 let isAdminAuthenticated    = false; // เช็คว่าแอดมินล็อกอินผ่าน PIN หรือยัง
 
+// ตัวแปรเก็บค่าช่วงเวลาทำงาน (เจมส์ ปรับปรุงดึงค่าแฮนเดิลอัตโนมัติ)
+let timeConfig = {
+    ciOpen: '07:00',
+    ciOntime: '08:00',
+    ciClose: '08:30',
+    coOpen: '16:30',
+    coClose: '17:00'
+};
+
 // ── DOM References ───────────────────────────────────────────────
 const tabRegister   = document.getElementById('tab-register');
 const tabCheckin    = document.getElementById('tab-checkin');
@@ -117,6 +126,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         ]));
     }
+    // อ่านค่าช่วงเวลาที่เคยบันทึกไว้ในเครื่อง
+    const savedConfig = localStorage.getItem('timeConfig');
+    if (savedConfig) {
+        timeConfig = JSON.parse(savedConfig);
+    }
+    loadTimeSettingsUI(); // โหลดเวลาเข้ากล่อง Input ทันที
+    
     migrateKeysIfNeeded();
     updateRecordCount();
     updateDashboard();
@@ -266,18 +282,22 @@ function getNowMinutes() {
     return toMinutes(now.getHours(), now.getMinutes());
 }
 
-/**
- * Returns: 'ontime' | 'late' | 'checkout' | 'closed'
- */
+// แปลงข้อความ HH:MM ให้กลายเป็นตัวเลขนาทีสำหรับการคิด Logic
+function strToMinutes(timeStr) {
+    if (!timeStr) return 0;
+    const parts = timeStr.split(':');
+    return toMinutes(parseInt(parts[0]) || 0, parseInt(parts[1]) || 0);
+}
+
 function getTimeWindow() {
     if (devModeActive) return 'dev';
 
     const now = getNowMinutes();
-    const CI_OPEN   = toMinutes(7,  0);
-    const CI_ONTIME = toMinutes(8,  0);
-    const CI_CLOSE  = toMinutes(8, 30);
-    const CO_OPEN   = toMinutes(16, 30);
-    const CO_CLOSE  = toMinutes(17, 0);
+    const CI_OPEN   = strToMinutes(timeConfig.ciOpen);
+    const CI_ONTIME = strToMinutes(timeConfig.ciOntime);
+    const CI_CLOSE  = strToMinutes(timeConfig.ciClose);
+    const CO_OPEN   = strToMinutes(timeConfig.coOpen);
+    const CO_CLOSE  = strToMinutes(timeConfig.coClose);
 
     if (now >= CI_OPEN && now <= CI_ONTIME)  return 'ontime';
     if (now >  CI_ONTIME && now <= CI_CLOSE) return 'late';
@@ -291,10 +311,10 @@ function updateTimeWindowUI(now) {
     timeWindowIndicator.className = 'time-window-indicator';
 
     const statuses = {
-        'ontime':  { cls: 'window-open-in',   txt: '✅ เปิดรับลงเวลาเข้างาน (ตรงเวลา) 07:00 – 08:00 น.' },
-        'late':    { cls: 'window-open-late',  txt: '⚠️ เปิดรับลงเวลาเข้างาน (มาสาย) 08:01 – 08:30 น.' },
-        'verylate':{ cls: 'window-closed',     txt: '🚨 ลงเวลาเข้างานสายมาก (ต้องระบุเหตุผล) หลัง 08:30 น.' },
-        'checkout':{ cls: 'window-open-out',   txt: '🔵 เปิดรับลงเวลาออกงาน 16:30 – 17:00 น.' },
+        'ontime':  { cls: 'window-open-in',   txt: `✅ เปิดรับลงเวลาเข้างาน (ตรงเวลา) ${timeConfig.ciOpen} – ${timeConfig.ciOntime} น.` },
+        'late':    { cls: 'window-open-late',  txt: `⚠️ เปิดรับลงเวลาเข้างาน (มาสาย) ${timeConfig.ciOntime} – ${timeConfig.ciClose} น.` },
+        'verylate':{ cls: 'window-closed',     txt: `🚨 ลงเวลาเข้างานสายมาก (ต้องระบุเหตุผล) หลัง ${timeConfig.ciClose} น.` },
+        'checkout':{ cls: 'window-open-out',   txt: `🔵 เปิดรับลงเวลาออกงาน ${timeConfig.coOpen} – ${timeConfig.coClose} น.` },
         'closed':  { cls: 'window-closed',     txt: '🔒 นอกช่วงเวลาลงเวลา' },
         'dev':     { cls: 'window-open-late',  txt: '🔧 Dev Mode: bypass เวลาเปิดอยู่' },
     };
@@ -332,6 +352,7 @@ function switchTab(tab) {
     if (tab === 'report') {
         filterAttendanceRecords();
         updateDashboard();
+        loadTimeSettingsUI(); // ดึงค่าเวลาล่าสุดมาเคลียร์หน้ารายงานแอดมินให้ถูกต้อง
     }
 }
 
@@ -630,8 +651,8 @@ function updateActionButtons() {
 
     const rec  = getTodayRecord(currentLookedUpStudent.studentId);
     const now = getNowMinutes();
-    const CO_OPEN = toMinutes(16, 30);
-    const CO_CLOSE = toMinutes(17, 0);
+    const CO_OPEN = strToMinutes(timeConfig.coOpen);
+    const CO_CLOSE = strToMinutes(timeConfig.coClose);
     
     const isCheckoutTime = (now >= CO_OPEN && now <= CO_CLOSE);
     const hasPhoto = !!currentCheckinPhoto;
@@ -720,23 +741,20 @@ function triggerAutoCheckin(student) {
     const mm = now.getMinutes();
     
     const currentMin = hh * 60 + mm;
-    const CI_OPEN = toMinutes(7, 0);
-    const CI_LATE = toMinutes(8, 0);
-    const CI_VERYLATE = toMinutes(8, 30);
+    const CI_OPEN = strToMinutes(timeConfig.ciOpen);
+    const CI_LATE = strToMinutes(timeConfig.ciOntime);
+    const CI_VERYLATE = strToMinutes(timeConfig.ciClose);
 
     if (!devModeActive && currentMin < CI_OPEN) {
-        showToast('🔒 ยังไม่เปิดให้ลงเวลาเข้างาน (เปิด 07:00 น.)', 'error');
+        showToast(`🔒 ยังไม่เปิดให้ลงเวลาเข้างาน (เปิด ${timeConfig.ciOpen} น.)`, 'error');
         return;
     }
 
     if (devModeActive || (currentMin >= CI_OPEN && currentMin <= CI_LATE)) {
-        // 07:00 - 08:00 -> ontime
         saveAutoCheckinRecord(student, 'ontime', '');
     } else if (currentMin > CI_LATE && currentMin <= CI_VERYLATE) {
-        // 08:01 - 08:30 -> late
         saveAutoCheckinRecord(student, 'late', '');
     } else {
-        // หลัง 08:30 -> verylate
         isCheckingInVeryLate = true;
         currentLookedUpStudent = student;
         openRemarkModal();
@@ -798,12 +816,12 @@ function handleCheckOut() {
     if (!currentLookedUpStudent) return;
 
     const now = getNowMinutes();
-    const CO_OPEN = toMinutes(16, 30);
-    const CO_CLOSE = toMinutes(17, 0);
+    const CO_OPEN = strToMinutes(timeConfig.coOpen);
+    const CO_CLOSE = strToMinutes(timeConfig.coClose);
     const isCheckoutTime = (now >= CO_OPEN && now <= CO_CLOSE);
 
     if (!devModeActive && !isCheckoutTime) {
-        showToast('ไม่อยู่ในช่วงเวลาลงเวลาออกงาน (16:30 – 17:00 น.)', 'error'); return;
+        showToast(`ไม่อยู่ในช่วงเวลาลงเวลาออกงาน (${timeConfig.coOpen} – ${timeConfig.coClose} น.)`, 'error'); return;
     }
 
     if (!currentCheckinPhoto) {
@@ -1379,4 +1397,92 @@ function openIndividualStatsModal(studentId) {
 function closeIndividualModal() {
     document.body.classList.remove('modal-open');
     document.getElementById('individual-modal').classList.remove('active');
+}
+
+// ⚙️ ฟังก์ชันโหลดค่าเวลาใส่กล่อง UI หน้าต่างรายงานแอดมิน
+function loadTimeSettingsUI() {
+    const cfgOpen = document.getElementById('cfg-ci-open');
+    const cfgOntime = document.getElementById('cfg-ci-ontime');
+    const cfgClose = document.getElementById('cfg-ci-close');
+    const cfgCoOpen = document.getElementById('cfg-co-open');
+    const cfgCoClose = document.getElementById('cfg-co-close');
+
+    if (cfgOpen) cfgOpen.value = timeConfig.ciOpen;
+    if (cfgOntime) cfgOntime.value = timeConfig.ciOntime;
+    if (cfgClose) cfgClose.value = timeConfig.ciClose;
+    if (cfgCoOpen) cfgCoOpen.value = timeConfig.coOpen;
+    if (cfgCoClose) cfgCoClose.value = timeConfig.coClose;
+}
+
+// ⚙️ ฟังก์ชันตรวจสอบและเซฟค่าเวลาใหม่ลง LocalStorage
+function saveTimeSettings() {
+    if (!isAdminAuthenticated) { openPinModal(); return; }
+    
+    const ciOpen = document.getElementById('cfg-ci-open').value;
+    const ciOntime = document.getElementById('cfg-ci-ontime').value;
+    const ciClose = document.getElementById('cfg-ci-close').value;
+    const coOpen = document.getElementById('cfg-co-open').value;
+    const coClose = document.getElementById('cfg-co-close').value;
+
+    // ระบบป้องกันความปลอดภัยตรวจสอบความสมเหตุสมผลของเวลา (Validation)
+    if (strToMinutes(ciOpen) >= strToMinutes(ciOntime)) {
+        showToast('❌ ข้อผิดพลาด: เวลาเปิดรับเข้างาน ต้องน้อยกว่า เวลาสิ้นสุดตรงเวลา', 'error');
+        return;
+    }
+    if (strToMinutes(ciOntime) >= strToMinutes(ciClose)) {
+        showToast('❌ ข้อผิดพลาด: เวลาสิ้นสุดตรงเวลา ต้องน้อยกว่า เวลาปิดรับเข้างาน', 'error');
+        return;
+    }
+    if (strToMinutes(coOpen) >= strToMinutes(coClose)) {
+        showToast('❌ ข้อผิดพลาด: เวลาเปิดออกงาน ตอนเย็น ต้องน้อยกว่า เวลาปิดรับออกงาน', 'error');
+        return;
+    }
+
+    // ทำการเซฟข้อมูลมัดก้อน
+    timeConfig = { ciOpen, ciOntime, ciClose, coOpen, coClose };
+    localStorage.setItem('timeConfig', JSON.stringify(timeConfig));
+    
+    showToast('⚙️ บันทึกการตั้งค่าช่วงเวลาลงเวลาชุดใหม่สำเร็จ ✓', 'success');
+    
+    // สั่งรีเฟรชอัปเดตหน้าแสดงผลหลักทันที
+    const now = new Date();
+    updateTimeWindowUI(now);
+}
+
+// ── Change PIN UI Functions (เจมส์ เพิ่มเติมเพื่อผูกฟังก์ชันหลังบ้าน) ───
+function openChangePinModal() {
+    if (!isAdminAuthenticated) { openPinModal(); return; } // กันเหนียวถ้าหลุดสิทธิ์
+
+    document.getElementById('cfg-old-pin').value = '';
+    document.getElementById('cfg-new-pin').value = '';
+    document.getElementById('cfg-confirm-pin').value = '';
+
+    document.getElementById('change-pin-modal').classList.add('active');
+    document.body.classList.add('modal-open');
+}
+
+function closeChangePinModal() {
+    document.getElementById('change-pin-modal').classList.remove('active');
+    document.body.classList.remove('modal-open');
+}
+
+function submitChangePin() {
+    const oldPin    = document.getElementById('cfg-old-pin').value.trim();
+    const newPin    = document.getElementById('cfg-new-pin').value.trim();
+    const confirmPin = document.getElementById('cfg-confirm-pin').value.trim();
+
+    if (!oldPin || !newPin || !confirmPin) {
+        showToast('⚠️ กรุณากรอกข้อมูลให้ครบทุกช่อง', 'warning');
+        return;
+    }
+
+    if (newPin !== confirmPin) {
+        showToast('❌ รหัส PIN ใหม่และช่องยืนยันไม่ตรงกัน', 'error');
+        return;
+    }
+
+    // เรียกฟังก์ชันหลักหลังบ้านที่มีอยู่แล้วเพื่อตรวจสอบและเซฟค่า
+    if (changeAdminPIN(oldPin, newPin)) {
+        closeChangePinModal();
+    }
 }
