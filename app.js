@@ -30,19 +30,20 @@ let timeConfig = {
     coClose: '17:00'
 };
 
-// 🌐 ส่วนกำหนดค่าเชื่อมต่อคลาวด์ Firebase Firestore (เจมส์ จัดเตรียมโครงสร้างให้)
+// 🌐 ชุดรหัสกุญแจเชื่อมต่อคลาวด์ Firebase Firestore ตัวจริงของคณะ IT (เจมส์ ถอดค่าให้เข้ากับระบบเดิม)
 const firebaseConfig = {
-    apiKey: "YOUR_API_KEY_HERE",
-    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_PROJECT_ID.appspot.com",
-    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-    appId: "YOUR_APP_ID"
+    apiKey: "AIzaSyDGRW_m1puYzumzE-qNYXO9n7IMwAgdV74",
+    authDomain: "jobnoe-4d585.firebaseapp.com",
+    projectId: "jobnoe-4d585",
+    storageBucket: "jobnoe-4d585.firebasestorage.app",
+    messagingSenderId: "599444815367",
+    appId: "1:599444815367:web:bf7fb38e6f4751cb23b4a2",
+    measurementId: "G-H47Z0EFHWC"
 };
 
-// เริ่มต้นระบบฐานข้อมูลออนไลน์
+// 🚨 ปรับแก้ตรงนี้เพื่อให้ทำงานร่วมกับ CDN Compat Mode ได้อย่างราบรื่นครับ
 firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
+const db = firebase.firestore(); // ✨ สำคัญมาก! ต้องประกาศ db ไว้ใช้คุยกับ Firestore คลาวด์ครับ
 
 // ── DOM References ───────────────────────────────────────────────
 const tabRegister   = document.getElementById('tab-register');
@@ -103,10 +104,9 @@ const remarkTextarea    = document.getElementById('remark-textarea');
 
 // ── Init ─────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
-    showToast('🌐 กำลังเชื่อมต่อฐานข้อมูลออนไลน์คณะ IT...', 'info', 2000);
 
+    // 1. โหลดการตั้งค่าช่วงเวลางานและรหัส PIN จากคลาวด์ก่อนเสมอ
     try {
-        // 1. โหลดการตั้งค่าช่วงเวลางานและรหัส PIN จากคลาวด์
         const configDoc = await db.collection('config').doc('settings').get();
         if (configDoc.exists) {
             const remoteData = configDoc.data();
@@ -117,23 +117,23 @@ document.addEventListener('DOMContentLoaded', async () => {
             await db.collection('config').doc('settings').set({ timeConfig, admin_pin: '1234' });
         }
         loadTimeSettingsUI();
-
-        // 2. ดึงข้อมูลนักศึกษาและประวัติเวลาทำงานทั้งหมดจากคลาวด์
-        await syncDataFromFirestore();
-
-        // 3. ระบบซิงค์ข้อมูลเก่าจาก LocalStorage ขึ้นคลาวด์อัตโนมัติ (Migration Engine)
-        await migrateLocalDataToCloud();
-
-    } catch (error) {
-        console.error('Firebase load failed:', error);
-        showToast('❌ เชื่อมต่อฐานข้อมูลคลาวด์ล้มเหลว ทำงานในโหมด Offline สำรอง', 'error', 5000);
-
-        // โหมดสำรองออฟไลน์ — ดึงจากแคชในเครื่อง
+    } catch (e) {
         const savedConfig = localStorage.getItem('timeConfig');
         if (savedConfig) timeConfig = JSON.parse(savedConfig);
         loadTimeSettingsUI();
-        dbStudents   = JSON.parse(localStorage.getItem('students') || '[]');
-        dbAttendance = JSON.parse(localStorage.getItem('attendanceRecords') || '[]');
+    }
+
+    // 2. เรียกเอนจินออนไลน์ กวาดข้อมูลจากคลาวด์ Firestore ลงแรมทันที
+    showToast('🌐 กำลังซิงค์ฐานข้อมูลออนไลน์คณะ IT...', 'info', 2000);
+    const cloudConnected = await syncDataFromFirestore();
+
+    if (cloudConnected) {
+        showToast('✅ เชื่อมต่อฐานข้อมูลออนไลน์สำเร็จ', 'success', 2000);
+        // ย้ายข้อมูลเก่าจาก LocalStorage ขึ้นคลาวด์ (ทำเพียงครั้งเดียว)
+        await migrateLocalDataToCloud();
+    } else {
+        showToast('⚠️ ไม่สามารถเชื่อมต่อคลาวด์ได้ ระบบรันโหมด Offline สำรอง', 'warning', 4000);
+        migrateKeysIfNeeded();
     }
 
     updateRecordCount();
@@ -141,7 +141,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     filterAttendanceRecords();
     startClock();
 
-    // ตัวแผงลับสำหรับนักพัฒนา (triple-click นาฬิกา)
+    // Triple-click on clock to reveal dev panel
     document.getElementById('clock-time').addEventListener('click', () => {
         devPanelClickCount++;
         if (devPanelClickCount >= 3) {
@@ -155,14 +155,30 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // ── ดึงข้อมูลทั้งหมดจาก Firestore เข้า RAM ─────────────────────
 async function syncDataFromFirestore() {
-    const studentSnap = await db.collection('students').get();
-    dbStudents = studentSnap.docs.map(doc => doc.data());
+    try {
+        // 1. ดึงข้อมูลรายชื่อนักศึกษาฝึกงาน/จ้างงานทั้งหมดจากคอลเลกชัน 'students'
+        const studentSnap = await db.collection('students').get();
+        dbStudents = studentSnap.docs.map(doc => doc.data());
 
-    const attendanceSnap = await db.collection('attendance').orderBy('date', 'desc').get();
-    dbAttendance = attendanceSnap.docs.map(doc => ({
-        ...doc.data(),
-        _docId: doc.id  // เก็บ Firestore document ID ไว้สำหรับอ้างอิงตอน update checkout
-    }));
+        // 2. ดึงประวัติการเข้าทำงานทั้งหมด เรียงลำดับตามวันที่จากใหม่ไปเก่า
+        const attendanceSnap = await db.collection('attendance').orderBy('date', 'desc').get();
+        dbAttendance = attendanceSnap.docs.map(doc => ({
+            ...doc.data(),
+            _docId: doc.id  // เก็บ Firestore document ID ไว้สำหรับอ้างอิงตอน update checkout
+        }));
+
+        console.log('🌐 [Firebase] ซิงค์ข้อมูลลง RAM เรียบร้อยสำเร็จ:', {
+            studentsCount: dbStudents.length,
+            attendanceCount: dbAttendance.length
+        });
+        return true; // ✅ เชื่อมต่อสำเร็จ
+    } catch (error) {
+        console.error('❌ [Firebase] เกิดข้อผิดพลาดในฟังก์ชัน syncDataFromFirestore:', error);
+        // โหมดสำรองออฟไลน์ — ดึงจากแคชในเครื่อง
+        dbStudents   = JSON.parse(localStorage.getItem('students') || '[]');
+        dbAttendance = JSON.parse(localStorage.getItem('attendanceRecords') || '[]');
+        return false; // ⚠️ เชื่อมต่อล้มเหลว ใช้ข้อมูลจาก LocalStorage แทน
+    }
 }
 
 // ── Migration Logic ──────────────────────────────────────────────
