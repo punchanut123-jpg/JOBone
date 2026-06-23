@@ -1430,35 +1430,69 @@ function backupDataToJSON() {
     showToast('💾 สำรองข้อมูลเป็นไฟล์ JSON สำเร็จ ✓', 'success');
 }
 
-// 📂 ฟังก์ชันกู้คืนข้อมูลจากไฟล์ JSON (Restore)
+// 📂 ฟังก์ชันกู้คืนข้อมูลจากไฟล์ JSON (Restore) [เจมส์อัปเกรด: รองรับการดันข้อมูลขึ้น Cloud Firestore]
 function restoreDataFromJSON(event) {
     const file = event.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = function(e) {
+
+    // เปลี่ยนฟังก์ชันภายในให้เป็น async เพื่อรองรับ await คลาวด์
+    reader.onload = async function(e) {
         try {
             const importedData = JSON.parse(e.target.result);
             if (!importedData.students || !importedData.attendance) {
                 showToast('❌ รูปแบบไฟล์สำรองไม่ถูกต้อง ไม่สามารถกู้คืนได้', 'error');
                 return;
             }
-            if (!confirm('⚠️ การกู้คืนข้อมูลจะเขียนทับข้อมูลปัจจุบันทั้งหมดในเครื่องนี้ คุณต้องการดำเนินการต่อใช่หรือไม่?')) {
+            if (!confirm('⚠️ การกู้คืนข้อมูลจะเขียนทับข้อมูลปัจจุบัน "ทั้งในเครื่องและบนคลาวด์" คุณต้องการดำเนินการต่อใช่หรือไม่?')) {
                 event.target.value = '';
                 return;
             }
-            dbStudents = importedData.students;
-            dbAttendance = importedData.attendance;
-            localStorage.setItem('students', JSON.stringify(dbStudents));
-            localStorage.setItem('attendanceRecords', JSON.stringify(dbAttendance));
+
+            showToast('⏳ กำลังล้างข้อมูลเก่าและอัปโหลดข้อมูลกู้คืนขึ้นคลาวด์...', 'info', 4000);
+
+            // 1. เคลียร์ข้อมูลเก่าบนคลาวด์ทิ้งก่อนด้วย Batch เพื่อป้องกันข้อมูลทับซ้อน
+            const [aSnap, sSnap] = await Promise.all([
+                db.collection('attendance').get(),
+                db.collection('students').get()
+            ]);
+            const deleteBatch = db.batch();
+            aSnap.docs.forEach(doc => deleteBatch.delete(doc.ref));
+            sSnap.docs.forEach(doc => deleteBatch.delete(doc.ref));
+            await deleteBatch.commit();
+
+            // 2. เริ่มสร้าง Batch ใหม่เพื่อดันข้อมูลจาก JSON ขึ้นคลาวด์
+            const writeBatch = db.batch();
+
+            // 2.1 ดันประวัตินักศึกษา (ใช้ studentId เป็น key เหมือนเดิม)
+            importedData.students.forEach(student => {
+                const docRef = db.collection('students').doc(student.studentId);
+                writeBatch.set(docRef, student);
+            });
+
+            // 2.2 ดันประวัติลงเวลา (ตัด _docId เก่าทิ้ง ให้คลาวด์เจน ID ใหม่เพื่อความสะอาด)
+            importedData.attendance.forEach(record => {
+                const { _docId, ...cleanRecord } = record;
+                const docRef = db.collection('attendance').doc();
+                writeBatch.set(docRef, cleanRecord);
+            });
+
+            // สั่งยืนยันการเขียนข้อมูลทั้งหมดขึ้นคลาวด์
+            await writeBatch.commit();
+
+            // 3. สั่งซิงค์ข้อมูลใหม่ทั้งหมดลง RAM เพื่อให้ _docId ตรงกับในคลาวด์เป๊ะๆ
+            await syncDataFromFirestore();
+
             updateRecordCount();
             updateDashboard();
             filterAttendanceRecords();
-            showToast('🔄 กู้คืนข้อมูลระบบทั้งหมดเรียบร้อยแล้ว ✓', 'success');
+            showToast('🔄 กู้คืนข้อมูลระบบขึ้นคลาวด์เรียบร้อยแล้ว ✓', 'success');
+
         } catch (err) {
-            console.error(err);
-            showToast('❌ เกิดข้อผิดพลาดในการอ่านไฟล์ JSON', 'error');
+            console.error('❌ Firebase Restore Error:', err);
+            showToast('❌ เกิดข้อผิดพลาดในการกู้คืนข้อมูลขึ้นคลาวด์', 'error');
         }
-        event.target.value = '';
+        event.target.value = ''; // รีเซ็ต input file
     };
     reader.readAsText(file);
 }
