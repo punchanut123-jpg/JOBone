@@ -644,6 +644,7 @@ function lookupStudent() {
             checkinPhotoSection.classList.remove('hidden');
             remarkSection.classList.remove('hidden');
             actionButtons.classList.remove('hidden');
+            btnCheckout.classList.remove('hidden'); // ✨ เปิดตัวปุ่มออกงาน (แก้ UI Bug)
             updateActionButtons();
         }
     } else {
@@ -840,6 +841,7 @@ async function saveAutoCheckinRecord(student, status, remark) {
         checkinPhotoSection.classList.remove('hidden');
         remarkSection.classList.remove('hidden');
         actionButtons.classList.remove('hidden');
+        btnCheckout.classList.remove('hidden'); // ✨ เปิดตัวปุ่มออกงานหลังจากเช็คอินเสร็จ (แก้ UI Bug)
         updateActionButtons();
     } catch(err) {
         console.error(err);
@@ -913,6 +915,7 @@ function resetCheckinState() {
     checkinPhotoPreviewCon.classList.add('hidden');
     checkinPhotoPreview.src = '';
     btnCheckinCamera.querySelector('span').textContent = 'ถ่ายรูปยืนยัน';
+    btnCheckout.classList.add('hidden'); // ✨ ซ่อนปุ่มกลับไปหลังทำงานเสร็จ (แก้ UI Bug)
     updateActionButtons();
 }
 
@@ -1068,13 +1071,37 @@ function renderAttendanceTable(data = dbAttendance) {
     });
 }
 
-function deleteAttendance(id) {
-    if (!confirm('ลบรายการนี้ใช่ไหม?')) return;
-    dbAttendance = dbAttendance.filter(r => r.id !== id && (r.studentId + '_' + r.date) !== id);
-    saveAttendance();
-    filterAttendanceRecords();
-    updateDashboard();
-    showToast('ลบรายการแล้ว', 'warning');
+// ✕ ฟังก์ชันลบรายการประวัติการเข้างานรายบุคคลออกจากคลาวด์และหน่วยความจำ (เจมส์ แก้ไขบั๊กลบไม่ขาด)
+async function deleteAttendance(id) {
+    if (!confirm('⚠️ คุณแน่ใจไหม? รายการประวัติลงเวลานี้จะถูกลบบนระบบออนไลน์คลาวด์ถาวร!')) return;
+
+    // ค้นหาเป้าหมายในอาร์เรย์เพื่อดึงค่า _docId ของคลาวด์ออกมาใช้งาน
+    const recordToDelete = dbAttendance.find(r => r.id === id || (r.studentId + '_' + r.date) === id);
+
+    if (recordToDelete && recordToDelete._docId) {
+        try {
+            showToast('⏳ กำลังลบข้อมูลบนคลาวด์...', 'info', 1500);
+            // 🌐 สั่งทำลายเอกสารบน Firebase Firestore คลาวด์จริง
+            await db.collection('attendance').doc(recordToDelete._docId).delete();
+
+            // ลบข้อมูลฝั่งโลคอลสเตตตามหลังเมื่อคลาวด์อนุมัติ
+            dbAttendance = dbAttendance.filter(r => r.id !== id && (r.studentId + '_' + r.date) !== id);
+            saveAttendance();
+            filterAttendanceRecords();
+            updateDashboard();
+            showToast('🗑️ ลบรายการบนคลาวด์เรียบร้อยแล้ว', 'warning');
+        } catch (error) {
+            console.error('❌ ลบข้อมูลบนคลาวด์ล้มเหลว:', error);
+            showToast('ไม่สามารถลบข้อมูลจากฐานข้อมูลคลาวด์ได้ กรุณาเช็คเครือข่าย', 'error');
+        }
+    } else {
+        // กรณีเป็นข้อมูล Offline เก่าที่ยังไม่มีคีย์คลาวด์
+        dbAttendance = dbAttendance.filter(r => r.id !== id && (r.studentId + '_' + r.date) !== id);
+        saveAttendance();
+        filterAttendanceRecords();
+        updateDashboard();
+        showToast('ลบรายการในเครื่องเรียบร้อย', 'warning');
+    }
 }
 
 // ── Photo Modal ──────────────────────────────────────────────────
