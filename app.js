@@ -804,14 +804,16 @@ function triggerAutoCheckin(student) {
     }
 }
 
+// 📌 ฟังก์ชันบันทึกเวลาเข้าปฏิบัติงานช่วงเช้าขึ้นสู่ Firestore คลาวด์ (เจมส์ แผนวันที่ 2)
 async function saveAutoCheckinRecord(student, status, remark) {
     const now = new Date();
     const timeStr = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false });
 
+    // 1. เตรียมชุดข้อมูล (ยังไม่มี ID ด้านคลาวด์)
     const record = {
         studentId: student.studentId,
         name: student.username,
-        date: getTodayDateStr(),
+        date: getTodayDateStr(),   // YYYY-MM-DD เพื่อให้ฟิลเตอร์ทำงานถูกต้อง
         checkIn: timeStr,
         checkOut: '',
         status: status,
@@ -821,19 +823,25 @@ async function saveAutoCheckinRecord(student, status, remark) {
     };
 
     try {
-        // เพิ่ม document ใหม่เข้า Firestore และรับ document ID กลับมา
+        // 2. สั่งเพิ่มเอกสารใหม่ลงในคอลเลกชัน 'attendance' บนคลาวด์
         const docRef = await db.collection('attendance').add(record);
-        record._docId = docRef.id;
 
+        // 3. ดึง ID ที่คลาวด์สร้างให้ มาผูกเก็บไว้ในตัวแปร RAM
+        record._docId = docRef.id; // ← เก็บไว้ใช้อ้างอิงตอน .update() เวลาออกงาน
+        record.id     = docRef.id; // ← ใช้เป็นคีย์สำหรับการแสดงผลและ deleteAttendance
+
+        // 4. บันทึกลงตัวแปร RAM เพื่อให้หน้าเว็บอัปเดตตารางทันที
         dbAttendance.unshift(record);
-        localStorage.setItem('attendanceRecords', JSON.stringify(dbAttendance));
+        localStorage.setItem('attendanceRecords', JSON.stringify(dbAttendance)); // สำรองเผื่อ offline
 
+        // 5. สั่งอัปเดตหน้าจอ UI
+        updateRecordCount();
         updateTodayStatusPill(student.studentId);
         updateDashboard();
         filterAttendanceRecords();
 
         let thaiStatus = 'ตรงเวลา'; let toastType = 'success';
-        if (status === 'late')     { thaiStatus = 'มาสาย';  toastType = 'warning'; }
+        if (status === 'late')          { thaiStatus = 'เข้างานสาย';  toastType = 'warning'; }
         else if (status === 'verylate') { thaiStatus = 'สายมาก'; toastType = 'error'; }
 
         showToast(`✅ บันทึกเวลาเข้างานออนไลน์เรียบร้อย ${timeStr} น. — สถานะ: ${thaiStatus}`, toastType, 4500);
@@ -841,11 +849,15 @@ async function saveAutoCheckinRecord(student, status, remark) {
         checkinPhotoSection.classList.remove('hidden');
         remarkSection.classList.remove('hidden');
         actionButtons.classList.remove('hidden');
-        btnCheckout.classList.remove('hidden'); // ✨ เปิดตัวปุ่มออกงานหลังจากเช็คอินเสร็จ (แก้ UI Bug)
+        btnCheckout.classList.remove('hidden');
         updateActionButtons();
-    } catch(err) {
-        console.error(err);
+
+        return record; // ← ส่ง record ที่มี _docId กลับไปเผื่อให้ผู้เรียกใช้ต่อได้
+
+    } catch (err) {
+        console.error('❌ ข้อผิดพลาดในการบันทึกเวลาเข้างาน:', err);
         showToast('❌ เกิดข้อผิดพลาดในการบันทึกเวลาเข้างานลงคลาวด์', 'error');
+        return null;
     }
 }
 
@@ -853,7 +865,7 @@ function handleCheckIn() {
     // Hidden in UI, auto check-in is used
 }
 
-// ── Check-out Logic ──────────────────────────────────────────────
+// 🔵 ฟังก์ชันอัปเดตเวลาเลิกปฏิบัติงานตอนเย็นโดยอัปเดตทับเอกสารเดิมบนคลาวด์ (เจมส์ แผนวันที่ 2)
 async function handleCheckOut() {
     if (!currentLookedUpStudent) return;
 
@@ -869,42 +881,51 @@ async function handleCheckOut() {
         showToast('กรุณาถ่ายรูปยืนยันตัวตนก่อนลงเวลาออกงาน', 'error'); return;
     }
 
+    // 1. ค้นหาประวัติการเข้างานของวันปัจจุบันใน RAM
     const rec = getTodayRecord(currentLookedUpStudent.studentId);
-    if (!rec)                                    { showToast('ยังไม่ได้ลงเวลาเข้างานวันนี้', 'error'); return; }
+    if (!rec) { showToast('ยังไม่ได้ลงเวลาเข้างานวันนี้', 'error'); return; }
     if (rec.checkOut || rec.status === 'checked_out') { showToast('คุณได้ลงเวลาออกงานวันนี้แล้ว', 'warning'); return; }
 
-    const timeStr = new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false });
+    // 2. ตรวจสอบความปลอดภัย — ต้องมี _docId จากคลาวด์จึงจะอัปเดตได้
     const idx = dbAttendance.findIndex(r => r.studentId === rec.studentId && r.date === rec.date);
+    if (idx === -1 || !dbAttendance[idx]._docId) {
+        showToast('❌ ไม่พบรหัสอ้างอิงเอกสารคลาวด์ กรุณาติดต่อแอดมิน', 'error'); return;
+    }
 
-    if (idx !== -1 && dbAttendance[idx]._docId) {
-        const docId = dbAttendance[idx]._docId;
-        const cloudUpdate = {
-            checkOut: timeStr,
-            checkOutPhoto: currentCheckinPhoto,
-            status: 'checked_out'
-        };
-        if (currentRemark && !dbAttendance[idx].remark) cloudUpdate.remark = currentRemark;
+    const timeStr = new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false });
+    const docId   = dbAttendance[idx]._docId;
 
-        try {
-            // อัปเดตเอกสาร Firestore เดิมโดยอ้างอิง document ID
-            await db.collection('attendance').doc(docId).update(cloudUpdate);
+    // 3. เตรียมชุดข้อมูลที่จะเขียนทับลงบนเอกสารเดิม
+    const cloudUpdate = {
+        checkOut: timeStr,
+        checkOutPhoto: currentCheckinPhoto,
+        status: 'checked_out'
+    };
+    if (currentRemark && !dbAttendance[idx].remark) cloudUpdate.remark = currentRemark;
 
-            dbAttendance[idx].checkOut     = timeStr;
-            dbAttendance[idx].checkOutPhoto = currentCheckinPhoto;
-            dbAttendance[idx].status        = 'checked_out';
-            if (cloudUpdate.remark) dbAttendance[idx].remark = currentRemark;
+    try {
+        showToast('⏳ กำลังอัปเดตเวลาออกงานขึ้นระบบคลาวด์...', 'info', 2000);
 
-            localStorage.setItem('attendanceRecords', JSON.stringify(dbAttendance));
-            updateTodayStatusPill(currentLookedUpStudent.studentId);
-            resetCheckinState();
-            updateDashboard();
-            filterAttendanceRecords();
-            showToast(`🔵 บันทึกเวลาออกงานออนไลน์สำเร็จ ${timeStr} น.`, 'success', 4500);
-            autoSaveToExcel();
-        } catch(err) {
-            console.error(err);
-            showToast('❌ ไม่สามารถส่งเวลาออกงานขึ้นระบบคลาวด์ได้', 'error');
-        }
+        // 4. อัปเดตเพียงเฉพาะฟิลด์ที่เปลี่ยน ไม่เขียนทับรูปเข้างาน
+        await db.collection('attendance').doc(docId).update(cloudUpdate);
+
+        // 5. อัปเดตตัวแปรใน RAM เพื่อให้หน้าจอเปลี่ยนสถานะโดยไม่ต้องโหลดหน้าใหม่
+        dbAttendance[idx].checkOut      = timeStr;
+        dbAttendance[idx].checkOutPhoto = currentCheckinPhoto;
+        dbAttendance[idx].status        = 'checked_out';
+        if (cloudUpdate.remark) dbAttendance[idx].remark = currentRemark;
+
+        localStorage.setItem('attendanceRecords', JSON.stringify(dbAttendance));
+        updateTodayStatusPill(currentLookedUpStudent.studentId);
+        resetCheckinState();
+        updateDashboard();
+        filterAttendanceRecords();
+        showToast(`🔵 บันทึกเวลาออกงานออนไลน์สำเร็จ ${timeStr} น.`, 'success', 4500);
+        autoSaveToExcel();
+
+    } catch (err) {
+        console.error('❌ ข้อผิดพลาดในการอัปเดตเวลาออกงาน:', err);
+        showToast('❌ ไม่สามารถอัปเดตข้อมูลบนคลาวด์ได้ กรุณาเช็คเครือข่าย', 'error');
     }
 }
 
