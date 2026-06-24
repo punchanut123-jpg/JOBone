@@ -1239,61 +1239,79 @@ async function clearAllData() {
     }
 }
 
-// ── Excel Export ─────────────────────────────────────────────────
+// ── 📊 ฟังก์ชันจัดเตรียมโครงสร้างอาร์เรย์แปลค่าเป็นภาษาไทยสำหรับส่งออก Excel ────────────────
 function buildExcelData() {
-    const header = ['ลำดับ', 'ชื่อ', 'รหัสนักศึกษา', 'วันที่', 'เวลาเข้า', 'เวลาออก', 'สถานะ', 'เหตุผลการมาสาย', 'มีรูปเข้า', 'มีรูปออก'];
+    const header = ['ลำดับ', 'ชื่อ-นามสกุล', 'รหัสนักศึกษา', 'วันที่ปฏิบัติงาน', 'เวลาเข้างาน', 'เวลาออกงาน', 'สถานะการเข้างาน', 'เหตุผลการมาสาย / หมายเหตุ', 'ถ่ายรูปเข้างาน', 'ถ่ายรูปออกงาน'];
+    
     const rows = dbAttendance.map((rec, i) => {
-        let displayStatus = 'On Time';
+        // 🇹🇭 แปลสเตตัสภาษาอังกฤษให้กลายเป็นภาษาไทยที่เป็นทางการสอดคล้องกับรายงาน
+        let displayStatus = 'ตรงเวลา (On Time)';
         if (rec.status === 'checked_out' || rec.checkOut) {
-            displayStatus = 'Checked Out';
+            displayStatus = 'ออกงานแล้ว (Checked Out)';
         } else if (rec.status === 'verylate') {
-            displayStatus = 'Very Late';
+            displayStatus = 'สายมาก (Very Late)';
         } else if (rec.status === 'late') {
-            displayStatus = 'Late';
+            displayStatus = 'มาสาย (Late)';
         }
 
         return [
             i + 1,
-            rec.name || rec.username || '',
+            rec.name || rec.username || '—',
             rec.studentId,
-            formatDisplayDate(rec.date),
+            formatDisplayDate(rec.date), // แปลงเป็นรูปแบบ วว/ดด/ปปปป (พ.ศ.) เพื่อความเป็นสากลของไทย
             rec.checkIn  || '—',
             rec.checkOut || '—',
             displayStatus,
             rec.remark || '—',
-            rec.checkInPhoto ? 'ใช่' : 'ไม่ใช่',
-            rec.checkOutPhoto ? 'ใช่' : 'ไม่ใช่'
+            rec.checkInPhoto ? 'มีรูปภาพ' : 'ไม่มีรูป',
+            rec.checkOutPhoto ? 'มีรูปภาพ' : 'ไม่มีรูป'
         ];
     });
     return [header, ...rows];
 }
 
+// ── 📥 ฟังก์ชันเรียกใช้ไลบรารี SheetJS (XLSX) เพื่อดาวน์โหลดไฟล์สเปรดชีตออนไลน์ ──────────────
 function exportToExcel() {
     if (dbAttendance.length === 0) {
-        showToast('ไม่มีข้อมูลสำหรับส่งออก', 'warning'); return;
+        showToast('⚠️ ไม่มีข้อมูลประวัติลงเวลาในระบบสำหรับส่งออกรายงาน', 'warning'); 
+        return;
     }
 
-    const wb   = XLSX.utils.book_new();
-    const ws   = XLSX.utils.aoa_to_sheet(buildExcelData());
+    try {
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.aoa_to_sheet(buildExcelData());
 
-    ws['!cols'] = [
-        { wch: 6 }, { wch: 24 }, { wch: 14 }, { wch: 14 },
-        { wch: 10 }, { wch: 10 }, { wch: 16 }, { wch: 24 },
-        { wch: 10 }, { wch: 10 }
-    ];
+        // 📏 ตั้งค่าล็อกขนาดความกว้างแต่ละคอลัมน์ให้อ่านง่ายพอดีหน้าจอ Excel ไม่ซ้อนทับกัน
+        ws['!cols'] = [
+            { wch: 6 },  // ลำดับ
+            { wch: 26 }, // ชื่อ-นามสกุล
+            { wch: 15 }, // รหัสนักศึกษา
+            { wch: 16 }, // วันที่ปฏิบัติงาน
+            { wch: 12 }, // เวลาเข้างาน
+            { wch: 12 }, // เวลาออกงาน
+            { wch: 22 }, // สถานะการเข้างาน
+            { wch: 30 }, // เหตุผลการมาสาย / หมายเหตุ
+            { wch: 14 }, // ถ่ายรูปเข้างาน
+            { wch: 14 }  // ถ่ายรูปออกงาน
+        ];
 
-    XLSX.utils.book_append_sheet(wb, ws, 'รายงานการลงเวลา');
+        XLSX.utils.book_append_sheet(wb, ws, 'รายงานการลงเวลา JOBone');
 
-    const now = new Date();
-    const y = now.getFullYear();
-    const m = String(now.getMonth() + 1).padStart(2, '0');
-    const d = String(now.getDate()).padStart(2, '0');
-    const hh = String(now.getHours()).padStart(2, '0');
-    const mm = String(now.getMinutes()).padStart(2, '0');
-    const filename = `attendance_${y}-${m}-${d}_${hh}-${mm}.xlsx`;
+        // ⏱️ ตั้งชื่อไฟล์อัตโนมัติอ้างอิงตาม วันที่ และ เวลาปัจจุบันที่กดดาวน์โหลด
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const d = String(now.getDate()).padStart(2, '0');
+        const hh = String(now.getHours()).padStart(2, '0');
+        const mm = String(now.getMinutes()).padStart(2, '0');
+        const filename = `JOBone_Attendance_${y}-${m}-${d}_${hh}-${mm}.xlsx`;
 
-    XLSX.writeFile(wb, filename);
-    showToast('ดาวน์โหลดไฟล์ Excel สำเร็จ ✓', 'success');
+        XLSX.writeFile(wb, filename);
+        showToast('📥 ดาวน์โหลดไฟล์ Excel รายงานสรุปออนไลน์สำเร็จแล้ว ✓', 'success');
+    } catch (error) {
+        console.error("❌ Export to Excel Error:", error);
+        showToast('❌ เกิดข้อผิดพลาดในการแปลงไฟล์สเปรดชีต', 'error');
+    }
 }
 
 function autoSaveToExcel() {
