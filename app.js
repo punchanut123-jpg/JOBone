@@ -1149,37 +1149,31 @@ function closePhotoModal() {
 }
 
 // ── Admin Actions ────────────────────────────────────────────────
-// ฟังก์ชันสำหรับแอดมิน: ล้างประวัติการเข้างานทั้งหมดบนคลาวด์
+// =================================================================
+// 🧹 2. อัปเกรดฟังก์ชันล้างเฉพาะประวัติการลงเวลาบนคลาวด์
+// =================================================================
 async function clearAttendanceOnly() {
     if (!isAdminAuthenticated) { openPinModal(); return; }
-    if (!confirm('⚠️ คุณแน่ใจใช่หรือไม่ที่จะ "ลบประวัติการเข้างานทั้งหมด" ข้อมูลบนคลาวด์จะหายถาวร!')) return;
-    
+    if (!confirm('⚠️ แอดมินแน่ใจไหม? ข้อมูลประวัติลงเวลาบนคลาวด์ทั้งหมดจะถูกลบถาวร!')) return;
+
     try {
-        showToast('⏳ กำลังล้างข้อมูลประวัติบนคลาวด์...', 'info', 2000);
+        showToast('⏳ กำลังล้างประวัติการทำงานบนคลาวด์...', 'info', 2000);
         
-        // ดึงเอกสารทั้งหมดจากคอลเลกชัน attendance
-        const snapshot = await db.collection('attendance').get();
+        const snap = await db.collection('attendance').get();
         const batch = db.batch();
-        
-        snapshot.docs.forEach(doc => {
-            batch.delete(doc.ref);
-        });
-        
-        // สั่งลบแบบกลุ่มบนคลาวด์
+        snap.docs.forEach(doc => batch.delete(doc.ref));
         await batch.commit();
-        
-        // รีเซ็ตตัวแปรในเครื่องและอัปเดตหน้าจอ
+
         dbAttendance = [];
-        localStorage.setItem('dbAttendance', JSON.stringify(dbAttendance));
+        localStorage.removeItem('attendanceRecords');
+        localStorage.removeItem('attendance_records');
         
-        updateRecordCount();
         updateDashboard();
         filterAttendanceRecords();
-        showToast('🗑️ ลบประวัติการเข้างานทั้งหมดสำเร็จ!', 'success');
-        
-    } catch (error) {
-        console.error("❌ Clear Attendance Error:", error);
-        showToast('❌ ไม่สามารถลบข้อมูลบนคลาวด์ได้', 'error');
+        showToast('🗑️ ล้างประวัติการทำงานบนคลาวด์เรียบร้อยแล้ว', 'success');
+    } catch(e) {
+        console.error("❌ Clear Attendance Error:", e);
+        showToast('❌ ไม่สามารถเคลียร์ข้อมูลออนไลน์ได้', 'error');
     }
 }
 
@@ -1206,40 +1200,40 @@ async function clearStudentsOnly() {
     }
 }
 
-// ฟังก์ชันสำหรับแอดมิน: ล้างข้อมูลระบบทั้งหมด (ทั้งรายชื่อและประวัติ)
+// =================================================================
+// 🚨 3. อัปเกรดฟังก์ชันทำลายและล้างข้อมูลระบบทั้งหมดในคลิกเดียว
+// =================================================================
 async function clearAllData() {
     if (!isAdminAuthenticated) { openPinModal(); return; }
-    if (!confirm('🚨 เตือนภัยขั้นสูงสุด! คุณต้องการลบ "ข้อมูลนักศึกษาและประวัติทั้งหมด" ใช่หรือไม่?')) return;
-    if (!confirm('確認: ข้อมูลจะถูกทำลายทิ้งถาวรและไม่สามารถกู้คืนได้อีก ยืนยันกดลบ?')) return;
-    
+    if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูลทั้งหมดในระบบ?')) return;
+    if (!confirm('🚨 ยืนยันคำรบที่สอง ข้อมูลนักศึกษาและประวัติทั้งหมดบนคลาวด์จะหายไปถาวร!')) return;
+
     try {
-        showToast('⏳ กำลังทำลายข้อมูลระบบบนคลาวด์...', 'info', 3000);
+        showToast('⏳ กำลังล้างข้อมูลทั้งหมดบนคลาวด์...', 'info', 3000);
         
         const [aSnap, sSnap] = await Promise.all([
             db.collection('attendance').get(),
             db.collection('students').get()
         ]);
-        
         const batch = db.batch();
         aSnap.docs.forEach(doc => batch.delete(doc.ref));
         sSnap.docs.forEach(doc => batch.delete(doc.ref));
-        
         await batch.commit();
-        
-        // ล้างค่าในเครื่องคอมพิวเตอร์
-        dbStudents = [];
+
+        dbStudents = []; 
         dbAttendance = [];
-        localStorage.setItem('dbStudents', JSON.stringify(dbStudents));
-        localStorage.setItem('dbAttendance', JSON.stringify(dbAttendance));
+        localStorage.removeItem('students');
+        localStorage.removeItem('student_records');
+        localStorage.removeItem('attendanceRecords');
+        localStorage.removeItem('attendance_records');
         
-        updateRecordCount();
-        updateDashboard();
+        updateRecordCount(); 
+        updateDashboard(); 
         filterAttendanceRecords();
-        showToast('💥 ทำลายข้อมูลระบบทั้งหมดเสร็จสิ้น!', 'success');
-        
-    } catch (error) {
-        console.error("❌ Clear All Data Error:", error);
-        showToast('❌ เกิดข้อผิดพลาดในการล้างระบบ', 'error');
+        showToast('💥 ล้างข้อมูลทั้งหมดในระบบคลาวด์เรียบร้อยแล้ว', 'success');
+    } catch(e) {
+        console.error("❌ Clear All Data Error:", e);
+        showToast('❌ ไม่สามารถเคลียร์ข้อมูลทั้งหมดออนไลน์ได้', 'error');
     }
 }
 
@@ -1445,7 +1439,9 @@ function backupDataToJSON() {
     showToast('💾 สำรองข้อมูลเป็นไฟล์ JSON สำเร็จ ✓', 'success');
 }
 
-// 📂 ฟังก์ชันกู้คืนข้อมูลจากไฟล์ JSON และซิงค์ขึ้น Cloud Firestore (เจมส์ อัปเกรด Cloud Async สมบูรณ์)
+// =================================================================
+// 📂 1. อัปเกรดฟังก์ชันกู้คืนข้อมูลระบบซิงค์ขึ้น Cloud Firestore
+// =================================================================
 async function restoreDataFromJSON(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -1455,17 +1451,17 @@ async function restoreDataFromJSON(event) {
         try {
             const importedData = JSON.parse(e.target.result);
             if (!importedData.students || !importedData.attendance) {
-                showToast('❌ รูปแบบไฟล์สำรองไม่ถูกต้อง', 'error');
+                showToast('❌ รูปแบบไฟล์สำรองไม่ถูกต้อง ไม่สามารถกู้คืนได้', 'error');
                 return;
             }
-            if (!confirm('⚠️ การกู้คืนข้อมูลจะเขียนทับข้อมูลปัจจุบัน "ทั้งในเครื่องและบนคลาวด์" ต้องการดำเนินการต่อใช่หรือไม่?')) {
+            if (!confirm('⚠️ การกู้คืนข้อมูลจะเขียนทับข้อมูลปัจจุบัน "ทั้งในเครื่องและบนคลาวด์" คุณต้องการดำเนินการต่อใช่หรือไม่?')) {
                 event.target.value = '';
                 return;
             }
 
-            showToast('⏳ กำลังล้างข้อมูลเก่าและอัปโหลดข้อมูลกู้คืน...', 'info', 4000);
+            showToast('⏳ กำลังล้างข้อมูลเก่าและอัปโหลดข้อมูลกู้คืนขึ้นคลาวด์...', 'info', 4000);
 
-            // 1. ดึงข้อมูลเก่ามาลบออกจาก Cloud Firestore ก่อน
+            // 1.1 เคลียร์ข้อมูลเก่าบนคลาวด์ทิ้งก่อนด้วย Batch ป้องกันข้อมูลซ้ำซ้อน
             const [aSnap, sSnap] = await Promise.all([
                 db.collection('attendance').get(),
                 db.collection('students').get()
@@ -1475,26 +1471,26 @@ async function restoreDataFromJSON(event) {
             sSnap.docs.forEach(doc => deleteBatch.delete(doc.ref));
             await deleteBatch.commit();
 
-            // 2. สร้าง Batch ใหม่เพื่อดันข้อมูลจากไฟล์ JSON ขึ้นคลาวด์
+            // 1.2 เริ่มสร้าง Batch ใหม่เพื่อดันข้อมูลจาก JSON ขึ้นคลาวด์ออนไลน์
             const writeBatch = db.batch();
             
-            // ใส่ประวัตินักศึกษาเข้า Batch
+            // ดันประวัตินักศึกษา (ใช้ studentId เป็น key เอกสาร)
             importedData.students.forEach(student => {
                 const docRef = db.collection('students').doc(student.studentId);
                 writeBatch.set(docRef, student);
             });
 
-            // ใส่ประวัติลงเวลาเข้า Batch
+            // ดันประวัติลงเวลา (ตัด _docId เก่าออก และปล่อยให้คลาวด์เจน ID ใหม่ให้เลย)
             importedData.attendance.forEach(record => {
                 const { _docId, ...cleanRecord } = record; 
                 const docRef = db.collection('attendance').doc();
                 writeBatch.set(docRef, cleanRecord);
             });
 
-            // ยืนยันการเขียนข้อมูลขึ้นระบบคลาวด์พร้อมกัน
+            // สั่งเขียนข้อมูลก้อนใหญ่ขึ้นฟ้าพร้อมกัน
             await writeBatch.commit();
 
-            // 3. สั่งดึงข้อมูลล่าสุดลงเครื่อง
+            // 1.3 ดึงข้อมูลล่าสุดกลับลงเครื่องคอมพิวเตอร์
             await syncDataFromFirestore();
             
             updateRecordCount();
@@ -1503,8 +1499,8 @@ async function restoreDataFromJSON(event) {
             showToast('🔄 กู้คืนข้อมูลระบบขึ้นคลาวด์เรียบร้อยแล้ว ✓', 'success');
 
         } catch (err) {
-            console.error("❌ Restore Error:", err);
-            showToast('❌ เกิดข้อผิดพลาดในการกู้คืนข้อมูล', 'error');
+            console.error("❌ Firebase Restore Error:", err);
+            showToast('❌ เกิดข้อผิดพลาดในการกู้คืนข้อมูลขึ้นคลาวด์', 'error');
         }
         event.target.value = '';
     };
