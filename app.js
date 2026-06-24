@@ -1182,6 +1182,7 @@ async function clearStudentsOnly() {
     if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูลนักศึกษาทั้งหมด?')) return;
 
     try {
+        showToast('⏳ กำลังล้างข้อมูลนักศึกษาบนคลาวด์...', 'info', 2000);
         const snap = await db.collection('students').get();
         const batch = db.batch();
         snap.docs.forEach(doc => batch.delete(doc.ref));
@@ -1190,10 +1191,11 @@ async function clearStudentsOnly() {
         dbStudents = [];
         localStorage.removeItem('students');
         localStorage.removeItem('student_records');
+        
         updateRecordCount();
         updateDashboard();
         filterAttendanceRecords();
-        showToast('ล้างข้อมูลนักศึกษาบนคลาวด์แล้ว', 'success');
+        showToast('🧹 ล้างข้อมูลนักศึกษาบนคลาวด์เรียบร้อยแล้ว', 'success');
     } catch(e) {
         console.error(e);
         showToast('❌ ไม่สามารถเคลียร์ข้อมูลนักศึกษาออนไลน์ได้', 'error');
