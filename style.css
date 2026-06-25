@@ -1526,14 +1526,21 @@ body {
 .admin-panel::before {
     content: "";
     position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: min(55%, 220px);
+    aspect-ratio: 1 / 1;
     background-image: url('logo.jpg');
     background-position: center;
     background-repeat: no-repeat;
-    background-size: 60% auto;
-    opacity: 0.12;
+    background-size: 85% auto;
+    background-color: #ffffff;
+    border-radius: 50%; /* 🎯 ตัดขอบให้เป็นวงกลมสมบูรณ์ */
+    opacity: 0.13;
     z-index: -1;
     pointer-events: none;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
 /* Scroll lock when modal is active */
