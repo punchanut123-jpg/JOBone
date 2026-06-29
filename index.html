@@ -262,34 +262,34 @@
             </div>
 
             <!-- Time Settings Section -->
-            <div class="admin-section" style="border-top: 1px solid var(--border-color); padding-top: 14px; margin-top: 14px;">
+            <div class="admin-section admin-section--time-settings">
                 <div class="admin-section-title">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                     ตั้งค่าช่วงเวลาการเข้าปฏิบัติงาน / ฝึกงาน
                 </div>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 12px; width: 100%;">
+                <div class="time-settings-grid">
                     <div>
-                        <label for="cfg-ci-open" style="font-size: 0.78rem; color: var(--text-muted); display: block; margin-bottom: 4px;">เปิดรับเข้างาน (ตรงเวลา):</label>
-                        <input type="time" id="cfg-ci-open" class="filter-input" style="width:100%; margin:0;">
+                        <label for="cfg-ci-open" class="time-settings-label">เปิดรับเข้างาน (ตรงเวลา):</label>
+                        <input type="time" id="cfg-ci-open" class="filter-input time-settings-input">
                     </div>
                     <div>
-                        <label for="cfg-ci-ontime" style="font-size: 0.78rem; color: var(--text-muted); display: block; margin-bottom: 4px;">สิ้นสุดตรงเวลา (เริ่มสาย):</label>
-                        <input type="time" id="cfg-ci-ontime" class="filter-input" style="width:100%; margin:0;">
+                        <label for="cfg-ci-ontime" class="time-settings-label">สิ้นสุดตรงเวลา (เริ่มสาย):</label>
+                        <input type="time" id="cfg-ci-ontime" class="filter-input time-settings-input">
                     </div>
                     <div>
-                        <label for="cfg-ci-close" style="font-size: 0.78rem; color: var(--text-muted); display: block; margin-bottom: 4px;">ปิดรับเข้างาน (สายมาก):</label>
-                        <input type="time" id="cfg-ci-close" class="filter-input" style="width:100%; margin:0;">
+                        <label for="cfg-ci-close" class="time-settings-label">ปิดรับเข้างาน (สายมาก):</label>
+                        <input type="time" id="cfg-ci-close" class="filter-input time-settings-input">
                     </div>
                     <div>
-                        <label for="cfg-co-open" style="font-size: 0.78rem; color: var(--text-muted); display: block; margin-bottom: 4px;">เปิดรับออกงาน (ตอนเย็น):</label>
-                        <input type="time" id="cfg-co-open" class="filter-input" style="width:100%; margin:0;">
+                        <label for="cfg-co-open" class="time-settings-label">เปิดรับออกงาน (ตอนเย็น):</label>
+                        <input type="time" id="cfg-co-open" class="filter-input time-settings-input">
                     </div>
                     <div>
-                        <label for="cfg-co-close" style="font-size: 0.78rem; color: var(--text-muted); display: block; margin-bottom: 4px;">ปิดรับออกงาน:</label>
-                        <input type="time" id="cfg-co-close" class="filter-input" style="width:100%; margin:0;">
+                        <label for="cfg-co-close" class="time-settings-label">ปิดรับออกงาน:</label>
+                        <input type="time" id="cfg-co-close" class="filter-input time-settings-input">
                     </div>
                 </div>
-                <button type="button" class="btn-admin btn-admin-warn" onclick="saveTimeSettings()" style="background: rgba(59, 130, 246, 0.08); color: var(--accent-color); border-color: rgba(59, 130, 246, 0.25);">
+                <button type="button" class="btn-admin btn-admin-save-time" onclick="saveTimeSettings()">
                     💾 บันทึกการตั้งค่าช่วงเวลา
                 </button>
             </div>
@@ -313,7 +313,7 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
                         ล้างข้อมูลทั้งหมด
                     </button>
-                    <button type="button" class="btn-admin btn-admin-warn" onclick="openChangePinModal()" style="background: rgba(245, 158, 11, 0.08); color: #b45309; border-color: rgba(245, 158, 11, 0.25);">
+                    <button type="button" class="btn-admin btn-admin-pin" onclick="openChangePinModal()">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1"/></svg>
                         เปลี่ยนรหัส PIN
                     </button>
@@ -321,12 +321,12 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                         สำรองข้อมูล (JSON)
                     </button>
-                    <label class="btn-admin btn-admin-warn" style="display: inline-flex; align-items: center; cursor: pointer; margin: 0;">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13" style="margin-right:6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    <label class="btn-admin btn-admin-warn btn-admin-file-label">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13" class="btn-admin-icon"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                         กู้คืนข้อมูล (JSON)
-                        <input type="file" accept=".json" onchange="restoreDataFromJSON(event)" style="display: none;">
+                        <input type="file" accept=".json" onchange="restoreDataFromJSON(event)" class="visually-hidden">
                     </label>
-                    <button type="button" class="btn-admin btn-admin-warn" onclick="migrateLocalDataToCloud()" style="background: rgba(16, 185, 129, 0.08); color: #065f46; border-color: rgba(16, 185, 129, 0.25);">
+                    <button type="button" class="btn-admin btn-admin-migrate" onclick="migrateLocalDataToCloud()">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
                         ย้ายข้อมูลเดิมขึ้นคลาวด์ (Manual)
                     </button>
@@ -471,59 +471,59 @@
 <div id="toast-container" class="toast-container"></div>
 
 <div id="individual-modal" class="modal-overlay" onclick="closeIndividualModal()">
-    <div class="modal-content" onclick="event.stopPropagation()" style="max-width: 460px;">
+    <div class="modal-content modal-content--individual" onclick="event.stopPropagation()">
         <div class="modal-header">
             <h3>สถิติและประวัติการลงเวลารายบุคคล</h3>
             <button class="modal-close" onclick="closeIndividualModal()">✕</button>
         </div>
-        <div style="padding: 20px; display: flex; flex-direction: column; gap: 16px; max-height: 80vh; overflow-y: auto;">
-            <div style="display: flex; align-items: center; gap: 16px; background: #f8fafc; padding: 12px; border-radius: 16px; border: 1px solid var(--border-color);">
-                <img id="ind-modal-photo" src="" alt="" style="width: 70px; height: 70px; border-radius: 12px; object-fit: cover; border: 2px solid var(--primary-color);">
+        <div class="ind-modal-body">
+            <div class="ind-modal-profile">
+                <img id="ind-modal-photo" src="" alt="" class="ind-modal-photo">
                 <div>
-                    <h4 id="ind-modal-name" style="font-size: 1.1rem; font-weight:600;">-</h4>
-                    <p id="ind-modal-id" style="font-size: 0.85rem; color: var(--text-muted); margin-top: 2px;">-</p>
-                    <p style="font-size: 0.85rem; font-weight:500; margin-top: 4px;">ลงเวลาทั้งหมด: <span id="ind-total-count" style="color: var(--accent-color); font-weight:700;">0 ครั้ง</span></p>
+                    <h4 id="ind-modal-name" class="ind-modal-name">-</h4>
+                    <p id="ind-modal-id" class="ind-modal-id">-</p>
+                    <p class="ind-modal-total">ลงเวลาทั้งหมด: <span id="ind-total-count" class="ind-total-count">0 ครั้ง</span></p>
                 </div>
             </div>
             <div>
-                <h5 style="font-size: 0.9rem; font-weight:600; margin-bottom: 10px;">📊 สรุปสถิติการเข้าปฏิบัติงาน</h5>
-                <div style="display: flex; flex-direction: column; gap: 8px;">
+                <h5 class="ind-section-title">📊 สรุปสถิติการเข้าปฏิบัติงาน</h5>
+                <div class="stat-bars-list">
                     <div>
-                        <div style="display: flex; justify-content: space-between; font-size: 0.78rem; margin-bottom: 3px;">
-                            <span>🟢 ตรงเวลา</span><span id="val-ontime-pct" style="font-weight:600;">0 ครั้ง (0%)</span>
+                        <div class="stat-bar-header">
+                            <span>🟢 ตรงเวลา</span><span id="val-ontime-pct" class="stat-bar-pct">0 ครั้ง (0%)</span>
                         </div>
-                        <div style="background: #e2e8f0; height: 10px; border-radius: 5px; overflow: hidden;">
-                            <div id="bar-ontime" style="background: var(--success-color); height: 100%; width: 0%; transition: width 0.5s ease-out;"></div>
+                        <div class="stat-bar-track">
+                            <div id="bar-ontime" class="stat-bar-fill stat-bar-fill--ontime"></div>
                         </div>
                     </div>
                     <div>
-                        <div style="display: flex; justify-content: space-between; font-size: 0.78rem; margin-bottom: 3px;">
-                            <span>🟡 เข้างานสาย</span><span id="val-late-pct" style="font-weight:600;">0 ครั้ง (0%)</span>
+                        <div class="stat-bar-header">
+                            <span>🟡 เข้างานสาย</span><span id="val-late-pct" class="stat-bar-pct">0 ครั้ง (0%)</span>
                         </div>
-                        <div style="background: #e2e8f0; height: 10px; border-radius: 5px; overflow: hidden;">
-                            <div id="bar-late" style="background: var(--warning-color); height: 100%; width: 0%; transition: width 0.5s ease-out;"></div>
+                        <div class="stat-bar-track">
+                            <div id="bar-late" class="stat-bar-fill stat-bar-fill--late"></div>
                         </div>
                     </div>
                     <div>
-                        <div style="display: flex; justify-content: space-between; font-size: 0.78rem; margin-bottom: 3px;">
-                            <span>🚨 สายมาก</span><span id="val-verylate-pct" style="font-weight:600;">0 ครั้ง (0%)</span>
+                        <div class="stat-bar-header">
+                            <span>🚨 สายมาก</span><span id="val-verylate-pct" class="stat-bar-pct">0 ครั้ง (0%)</span>
                         </div>
-                        <div style="background: #e2e8f0; height: 10px; border-radius: 5px; overflow: hidden;">
-                            <div id="bar-verylate" style="background: var(--danger-color); height: 100%; width: 0%; transition: width 0.5s ease-out;"></div>
+                        <div class="stat-bar-track">
+                            <div id="bar-verylate" class="stat-bar-fill stat-bar-fill--verylate"></div>
                         </div>
                     </div>
                 </div>
             </div>
             <div>
-                <h5 style="font-size: 0.9rem; font-weight:600; margin-bottom: 8px;">📅 ประวัติการลงเวลาย้อนหลัง</h5>
-                <div style="border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; max-height: 200px; overflow-y: auto;">
-                    <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem; text-align: left;">
-                        <thead style="background: #f1f5f9; position: sticky; top:0;">
+                <h5 class="ind-section-title">📅 ประวัติการลงเวลาย้อนหลัง</h5>
+                <div class="ind-history-wrapper">
+                    <table class="ind-history-table">
+                        <thead class="ind-history-thead">
                             <tr>
-                                <th style="padding: 8px; text-align:center;">#</th>
-                                <th style="padding: 8px;">วันที่</th>
-                                <th style="padding: 8px;">เวลา (เข้า/ออก)</th>
-                                <th style="padding: 8px;">สถานะ</th>
+                                <th class="ind-th ind-th--center">#</th>
+                                <th class="ind-th">วันที่</th>
+                                <th class="ind-th">เวลา (เข้า/ออก)</th>
+                                <th class="ind-th">สถานะ</th>
                             </tr>
                         </thead>
                         <tbody id="ind-history-tbody"></tbody>
@@ -535,28 +535,28 @@
 </div>
 
 <div id="change-pin-modal" class="modal-overlay">
-    <div class="modal-content" style="max-width: 360px;">
+    <div class="modal-content modal-content--change-pin">
         <div class="modal-header">
             <h3>🔑 เปลี่ยนรหัส PIN แอดมิน</h3>
             <button class="modal-close" onclick="closeChangePinModal()">✕</button>
         </div>
-        <div style="padding: 20px; display: flex; flex-direction: column; gap: 12px;">
+        <div class="change-pin-body">
             <div>
-                <label for="cfg-old-pin" style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 4px;">รหัส PIN เดิม:</label>
+                <label for="cfg-old-pin" class="pin-form-label">รหัส PIN เดิม:</label>
                 <input type="password" id="cfg-old-pin" class="form-input" placeholder="กรอกรหัสเดิม (เริ่มต้น 1234)" maxlength="6" inputmode="numeric" autocomplete="off">
             </div>
             <div>
-                <label for="cfg-new-pin" style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 4px;">รหัส PIN ใหม่:</label>
+                <label for="cfg-new-pin" class="pin-form-label">รหัส PIN ใหม่:</label>
                 <input type="password" id="cfg-new-pin" class="form-input" placeholder="กรอกรหัสใหม่ (ตัวเลข 4-6 หลัก)" maxlength="6" inputmode="numeric" autocomplete="off">
             </div>
             <div>
-                <label for="cfg-confirm-pin" style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 4px;">ยืนยันรหัส PIN ใหม่:</label>
+                <label for="cfg-confirm-pin" class="pin-form-label">ยืนยันรหัส PIN ใหม่:</label>
                 <input type="password" id="cfg-confirm-pin" class="form-input" placeholder="กรอกรหัสใหม่ซ้ำอีกครั้ง" maxlength="6" inputmode="numeric" autocomplete="off">
             </div>
         </div>
-        <div class="modal-footer" style="background: #f8fafc; border-top: 1px solid #f0f4f8; padding: 12px 16px;">
-            <button class="btn-remark-cancel" onclick="closeChangePinModal()" style="padding: 9px;">ยกเลิก</button>
-            <button class="btn-remark-save" onclick="submitChangePin()" style="background: var(--primary-color); box-shadow: 0 4px 10px rgba(7,48,83,0.2); padding: 9px;">บันทึกรหัสใหม่</button>
+        <div class="modal-footer change-pin-footer">
+            <button class="btn-remark-cancel btn-pin-compact" onclick="closeChangePinModal()">ยกเลิก</button>
+            <button class="btn-remark-save btn-pin-save" onclick="submitChangePin()">บันทึกรหัสใหม่</button>
         </div>
     </div>
 </div>
@@ -564,6 +564,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
+<script src="config.js"></script>
+<script src="camera.js"></script>
+<script src="database.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
