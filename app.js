@@ -38,6 +38,32 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore(); // ✨ สำคัญมาก! ต้องประกาศ db ไว้ใช้คุยกับ Firestore คลาวด์ครับ
 
+// 📍 ฟังก์ชันดึงพิกัด GPS ปัจจุบันของผู้ใช้งาน (พิกัดละติจูด, ลองจิจูด)
+function getGPSLocation() {
+    return new Promise((resolve) => {
+        if (!navigator.geolocation) {
+            console.warn("เบราว์เซอร์นี้ไม่รองรับ Geolocation");
+            resolve(null);
+            return;
+        }
+
+        // ขอพิกัดจากเบราว์เซอร์
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                resolve({
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude
+                });
+            },
+            (error) => {
+                console.warn("ไม่สามารถดึงพิกัด GPS ได้ (ผู้ใช้อาจปฏิเสธสิทธิ์):", error);
+                resolve(null); // ถ้าดึงไม่ได้ หรือผู้ใช้กด Block ให้ส่งค่า null กลับไป
+            },
+            { enableHighAccuracy: true, timeout: 6000, maximumAge: 0 } // เน้นความแม่นยำสูง
+        );
+    });
+}
+
 // ── DOM References ───────────────────────────────────────────────
 const tabRegister   = document.getElementById('tab-register');
 const tabCheckin    = document.getElementById('tab-checkin');
@@ -797,12 +823,15 @@ function triggerAutoCheckin(student) {
     }
 }
 
-// 📌 ฟังก์ชันบันทึกเวลาเข้าปฏิบัติงานช่วงเช้าขึ้นสู่ Firestore คลาวด์ (เจมส์ แผนวันที่ 2)
+// 📌 ฟังก์ชันบันทึกเวลาเข้าปฏิบัติงานช่วงเช้าขึ้นสู่ Firestore คลาวด์
 async function saveAutoCheckinRecord(student, status, remark) {
     const now = new Date();
     const timeStr = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false });
 
-    // 1. เตรียมชุดข้อมูล (ยังไม่มี ID ด้านคลาวด์)
+    showToast('📍 กำลังดึงพิกัดตำแหน่ง...', 'info', 1500);
+    const location = await getGPSLocation(); // 📍 ดึงพิกัด GPS ก่อนบันทึก
+
+    // 1. เตรียมชุดข้อมูล (เพิ่มฟิลด์ Location)
     const record = {
         studentId: student.studentId,
         name: student.username,
@@ -812,7 +841,9 @@ async function saveAutoCheckinRecord(student, status, remark) {
         status: status,
         remark: remark,
         checkInPhoto: currentCheckinPhoto || '',
-        checkOutPhoto: ''
+        checkOutPhoto: '',
+        checkInLocation: location || null, // 📍 เก็บพิกัดขาเข้า
+        checkOutLocation: null
     };
 
     try {
@@ -888,11 +919,15 @@ async function handleCheckOut() {
     const timeStr = new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false });
     const docId   = dbAttendance[idx]._docId;
 
-    // 3. เตรียมชุดข้อมูลที่จะเขียนทับลงบนเอกสารเดิม
+    showToast('📍 กำลังดึงพิกัดตำแหน่ง...', 'info', 1500);
+    const location = await getGPSLocation(); // 📍 ดึงพิกัด GPS ตอนออกงาน
+
+    // 3. เตรียมชุดข้อมูลที่จะเขียนทับลงบนเอกสารเดิม (เพิ่มพิกัดขาออก)
     const cloudUpdate = {
         checkOut: timeStr,
         checkOutPhoto: currentCheckinPhoto,
-        status: 'checked_out'
+        status: 'checked_out',
+        checkOutLocation: location || null // 📍 เก็บพิกัดขาออก
     };
     if (currentRemark && !dbAttendance[idx].remark) cloudUpdate.remark = currentRemark;
 
