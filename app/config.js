@@ -26,7 +26,7 @@ let timeConfig = {
     ciOntime: '08:00',
     ciClose: '08:30',
     coOpen: '16:30',
-    coClose: '17:00'
+    coClose: '16:40'
 };
 
 // 🌐 ชุดรหัสกุญแจเชื่อมต่อคลาวด์ Firebase Firestore 
