@@ -441,6 +441,8 @@ function openPinModal() {
     document.getElementById('pin-input').value = '';
     document.querySelectorAll('.pin-dot').forEach(d => d.classList.remove('filled'));
     document.getElementById('pin-error').classList.add('hidden');
+    const modalContent = document.querySelector('.pin-modal-content');
+    if (modalContent) modalContent.classList.remove('shake');
     document.getElementById('pin-tab-target').value = 'report';
     document.getElementById('pin-modal').classList.add('active');
     setTimeout(() => document.getElementById('pin-input').focus(), 200);
@@ -449,12 +451,16 @@ function closePinModal() {
     document.getElementById('pin-modal').classList.remove('active');
     document.getElementById('pin-input').value = '';
     document.querySelectorAll('.pin-dot').forEach(d => d.classList.remove('filled'));
+    const modalContent = document.querySelector('.pin-modal-content');
+    if (modalContent) modalContent.classList.remove('shake');
 }
 function onPinInput(e) {
     const val  = e.target.value.replace(/\D/g, '').slice(0, 6);
     e.target.value = val;
     document.querySelectorAll('.pin-dot').forEach((d, i) => d.classList.toggle('filled', i < val.length));
     document.getElementById('pin-error').classList.add('hidden');
+    const modalContent = document.querySelector('.pin-modal-content');
+    if (modalContent) modalContent.classList.remove('shake');
     if (val.length >= 4) submitPin();
 }
 function submitPin() {
@@ -462,6 +468,12 @@ function submitPin() {
     if (verifyAdminPIN(val)) {
         closePinModal(); switchTab(document.getElementById('pin-tab-target').value || 'report');
     } else {
+        const modalContent = document.querySelector('.pin-modal-content');
+        if (modalContent) {
+            modalContent.classList.remove('shake');
+            void modalContent.offsetWidth; // Trigger reflow to restart animation
+            modalContent.classList.add('shake');
+        }
         document.getElementById('pin-error').classList.remove('hidden');
         document.getElementById('pin-input').value = '';
         document.querySelectorAll('.pin-dot').forEach(d => d.classList.remove('filled'));
@@ -487,3 +499,17 @@ function submitChangePin() {
     if (newPin !== confirmPin) { showToast('❌ รหัส PIN ใหม่และช่องยืนยันไม่ตรงกัน', 'error'); return; }
     if (changeAdminPIN(oldPin, newPin)) closeChangePinModal();
 }
+
+// Global key handler for accessibility (Escape key to close modals)
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        const pinModal = document.getElementById('pin-modal');
+        if (pinModal && pinModal.classList.contains('active')) {
+            closePinModal();
+        }
+        const changePinModal = document.getElementById('change-pin-modal');
+        if (changePinModal && changePinModal.classList.contains('active')) {
+            closeChangePinModal();
+        }
+    }
+});
