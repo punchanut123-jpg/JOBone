@@ -279,9 +279,12 @@ function closeRemarkModal() {
         actionButtons.classList.add('hidden'); remarkSection.classList.add('hidden');
     }
 }
-function setQuickRemark(text) { remarkTextarea.value = text; }
+function setQuickRemark(text) { remarkTextarea.value = text.slice(0, 5); }
 function saveRemark() {
-    const val = remarkTextarea.value.trim();
+    let val = remarkTextarea.value.trim();
+    if (val.length > 5) {
+        val = val.slice(0, 5);
+    }
     if (isCheckingInVeryLate) {
         if (!val) { showToast('กรุณาระบุเหตุผลการมาสาย', 'error'); return; }
         saveAutoCheckinRecord(currentLookedUpStudent, 'verylate', val);
@@ -373,6 +376,88 @@ function openPhotoModal(photoSrc, username, timeInfo, photoType) {
     document.getElementById('photo-modal').classList.add('active');
 }
 function closePhotoModal() { document.getElementById('photo-modal').classList.remove('active'); }
+
+function openStudentHistoryModal() {
+    document.getElementById('sh-student-id').value = '';
+    document.getElementById('sh-student-pin').value = '';
+    document.getElementById('sh-error').classList.add('hidden');
+    document.getElementById('sh-form-container').classList.remove('hidden');
+    document.getElementById('sh-result-container').classList.add('hidden');
+    document.getElementById('student-history-modal').classList.add('active');
+    document.body.classList.add('modal-open');
+}
+
+function closeStudentHistoryModal() {
+    document.getElementById('student-history-modal').classList.remove('active');
+    document.body.classList.remove('modal-open');
+}
+
+function backToHistoryForm() {
+    document.getElementById('sh-student-pin').value = '';
+    document.getElementById('sh-error').classList.add('hidden');
+    document.getElementById('sh-form-container').classList.remove('hidden');
+    document.getElementById('sh-result-container').classList.add('hidden');
+}
+
+function submitStudentHistory(event) {
+    event.preventDefault();
+    const studentId = document.getElementById('sh-student-id').value.trim();
+    const pin = document.getElementById('sh-student-pin').value.trim();
+    const errorEl = document.getElementById('sh-error');
+    const errorTextEl = document.getElementById('sh-error-text');
+
+    errorEl.classList.add('hidden');
+
+    const student = dbStudents.find(s => s.studentId === studentId);
+    if (!student) {
+        errorTextEl.textContent = 'ไม่พบรหัสนักศึกษานี้ในระบบ';
+        errorEl.classList.remove('hidden');
+        return;
+    }
+
+    const savedPin = student.pin || '1234';
+    if (savedPin !== pin) {
+        errorTextEl.textContent = 'รหัส PIN ไม่ถูกต้อง';
+        errorEl.classList.remove('hidden');
+        return;
+    }
+
+    document.getElementById('sh-student-photo').src = student.photo || '';
+    document.getElementById('sh-student-name').textContent = student.username;
+    document.getElementById('sh-student-id-display').textContent = `รหัส: ${student.studentId}`;
+
+    const personalHistory = dbAttendance.filter(r => r.studentId === studentId)
+        .sort((a, b) => b.date.localeCompare(a.date));
+
+    document.getElementById('sh-student-total-count').textContent = `${personalHistory.length} ครั้ง`;
+
+    const tbody = document.getElementById('sh-history-tbody');
+    tbody.innerHTML = '';
+
+    if (personalHistory.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--text-muted)">ยังไม่มีประวัติการลงเวลา</td></tr>`;
+    } else {
+        const limitedHistory = personalHistory.slice(0, 30);
+        limitedHistory.forEach((rec, idx) => {
+            let statusText = 'ตรงเวลา', statusClass = 'tbl-ontime';
+            if (rec.status === 'late') { statusText = 'มาสาย'; statusClass = 'tbl-late'; }
+            else if (rec.status === 'verylate') { statusText = 'สายมาก'; statusClass = 'tbl-verylate'; }
+            else if (rec.status === 'checked_out') { statusText = 'ออกงานแล้ว'; statusClass = 'tbl-checkout'; }
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td style="text-align:center">${idx + 1}</td>
+                <td>${formatDisplayDate(rec.date)}</td>
+                <td style="font-weight:500">${rec.checkIn || '—'} / ${rec.checkOut || '—'}</td>
+                <td><span class="tbl-status ${statusClass}">${statusText}</span></td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    document.getElementById('sh-form-container').classList.add('hidden');
+    document.getElementById('sh-result-container').classList.remove('hidden');
+}
 
 function openIndividualStatsModal(studentId) {
     const student = dbStudents.find(s => s.studentId === studentId);
@@ -510,6 +595,10 @@ document.addEventListener('keydown', (e) => {
         const changePinModal = document.getElementById('change-pin-modal');
         if (changePinModal && changePinModal.classList.contains('active')) {
             closeChangePinModal();
+        }
+        const shModal = document.getElementById('student-history-modal');
+        if (shModal && shModal.classList.contains('active')) {
+            closeStudentHistoryModal();
         }
     }
 });

@@ -31,13 +31,13 @@ let timeConfig = {
 
 // 🌐 ชุดรหัสกุญแจเชื่อมต่อคลาวด์ Firebase Firestore 
 const firebaseConfig = {
-    apiKey: "AIzaSyDGRW_m1puYzumzE-qNYXO9n7IMwAgdV74",
-    authDomain: "jobnoe-4d585.firebaseapp.com",
-    projectId: "jobnoe-4d585",
-    storageBucket: "jobnoe-4d585.firebasestorage.app",
-    messagingSenderId: "599444815367",
-    appId: "1:599444815367:web:bf7fb38e6f4751cb23b4a2",
-    measurementId: "G-H47Z0EFHWC"
+    apiKey: "AIzaSyBLZpdxQywsdtVEip1Ups7iiHRGzSGqNfo",
+    authDomain: "job-one-b3179.firebaseapp.com",
+    projectId: "job-one-b3179",
+    storageBucket: "job-one-b3179.firebasestorage.app",
+    messagingSenderId: "501813633725",
+    appId: "1:501813633725:web:95df7658485504ca670dd4",
+    measurementId: "G-P9F1NRK7CH"
 };
 
 // กำหนดค่า Firebase

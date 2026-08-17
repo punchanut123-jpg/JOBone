@@ -49,8 +49,10 @@ async function handleRegister(event) {
     event.preventDefault();
     const username  = document.getElementById('username').value.trim();
     const studentId = document.getElementById('student-id').value.trim();
+    const pin       = document.getElementById('student-pin').value.trim();
 
-    if (!username || !studentId) { showToast('กรุณากรอกข้อมูลให้ครบถ้วน', 'error'); return; }
+    if (!username || !studentId || !pin) { showToast('กรุณากรอกข้อมูลให้ครบถ้วน', 'error'); return; }
+    if (pin.length !== 4 || isNaN(pin)) { showToast('กรุณาระบุรหัส PIN เป็นตัวเลข 4 หลัก', 'error'); return; }
     if (!currentPhotoBase64) { showToast('กรุณาถ่ายรูปเพื่อยืนยันตัวตน', 'error'); return; }
     if (dbStudents.some(s => s.studentId === studentId)) { showToast('รหัสนักศึกษานี้ลงทะเบียนไปแล้ว', 'error'); return; }
 
@@ -58,6 +60,7 @@ async function handleRegister(event) {
         id: Date.now().toString(),
         username,
         studentId,
+        pin,
         photo: currentPhotoBase64,
         registeredAt: new Date().toLocaleString('th-TH', { hour12: false })
     };
