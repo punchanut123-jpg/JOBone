@@ -1831,3 +1831,431 @@ body {
 #sh-error {
     margin-bottom: 16px;
 }
+
+/* =====================================================
+   Student Home View Styling
+   ===================================================== */
+.student-dashboard {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 100%;
+}
+
+.student-profile-banner {
+    background: linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(30, 58, 138, 0.85) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 20px;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
+    color: #fff;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.student-profile-info {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.student-profile-avatar {
+    width: 54px;
+    height: 54px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    background: #1e293b;
+}
+
+.student-profile-details {
+    display: flex;
+    flex-direction: column;
+}
+
+.student-profile-name {
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: #ffffff;
+    line-height: 1.2;
+}
+
+.student-profile-id {
+    font-size: 0.82rem;
+    color: rgba(255, 255, 255, 0.7);
+    font-family: 'Inter', monospace;
+    margin-top: 3px;
+}
+
+.btn-logout-student {
+    background: rgba(239, 68, 68, 0.15);
+    color: #fca5a5;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    padding: 8px 14px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-family: 'Kanit', sans-serif;
+    font-size: 0.82rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: var(--transition-smooth);
+}
+
+.btn-logout-student:hover {
+    background: #ef4444;
+    color: #ffffff;
+    border-color: #ef4444;
+}
+
+.home-status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 14px;
+    width: 100%;
+}
+
+.home-card {
+    background: #ffffff;
+    border-radius: 18px;
+    padding: 16px 18px;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.home-card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid #f1f5f9;
+    padding-bottom: 8px;
+}
+
+.home-card-icon {
+    font-size: 1.1rem;
+}
+
+.home-card-title {
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+.home-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: flex-start;
+}
+
+.shome-subtext {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+.home-time-details {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.time-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.88rem;
+}
+
+.time-label {
+    color: var(--text-muted);
+}
+
+.time-value {
+    font-weight: 600;
+    font-family: 'Inter', sans-serif;
+}
+
+.time-value.text-green { color: #10b981; }
+.time-value.text-blue  { color: #3b82f6; }
+
+.monthly-summary-section {
+    background: #ffffff;
+    border-radius: 18px;
+    padding: 18px;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.monthly-summary-section .section-title {
+    font-size: 0.98rem;
+    font-weight: 600;
+    color: var(--text-main);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.monthly-grid {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+/* =====================================================
+   Standalone Register Mode & Flow Overrides
+   ===================================================== */
+body.standalone-mode .sidebar,
+body.standalone-mode .mobile-header,
+body.standalone-mode .sidebar-overlay {
+    display: none !important;
+}
+
+body.standalone-mode .app-container {
+    justify-content: center;
+    max-width: 540px;
+}
+
+body.standalone-mode .content-area {
+    width: 100%;
+}
+
+.admin-login-link-container {
+    margin-top: 14px;
+    text-align: center;
+}
+
+.btn-link-admin {
+    background: none;
+    border: none;
+    color: var(--accent-color);
+    font-family: 'Kanit', sans-serif;
+    font-size: 0.88rem;
+    font-weight: 500;
+    cursor: pointer;
+    text-decoration: underline;
+    transition: var(--transition-smooth);
+}
+
+.btn-link-admin:hover {
+    color: var(--theme-dark);
+}
+
+/* Home Primary Action Button (ลงเวลาเข้า / ลงเวลาออก) */
+.home-action-container {
+    width: 100%;
+    margin-bottom: 6px;
+}
+
+.btn-home-attendance {
+    width: 100%;
+    padding: 16px 24px;
+    border-radius: 20px;
+    font-family: 'Kanit', sans-serif;
+    font-size: 1.25rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    transition: var(--transition-smooth);
+    border: none;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+}
+
+.btn-home-attendance.btn-home-checkin {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: #ffffff;
+    box-shadow: 0 6px 20px rgba(16, 185, 129, 0.3);
+}
+
+.btn-home-attendance.btn-home-checkin:hover {
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(16, 185, 129, 0.4);
+}
+
+.btn-home-attendance.btn-home-checkout {
+    background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+    color: #ffffff;
+    box-shadow: 0 6px 20px rgba(2, 132, 199, 0.3);
+}
+
+.btn-home-attendance.btn-home-checkout:hover {
+    background: linear-gradient(135deg, #0369a1 0%, #075985 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(2, 132, 199, 0.4);
+}
+
+.btn-home-attendance.btn-home-done {
+    background: #e2e8f0;
+    color: #94a3b8;
+    cursor: not-allowed;
+    box-shadow: none;
+    border: 1px solid #cbd5e1;
+}
+
+.btn-home-attendance:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+/* =====================================================
+   Toast Notifications
+   ===================================================== */
+.toast-container {
+    position: fixed;
+    top: 24px;
+    right: 24px;
+    z-index: 99999;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    pointer-events: none;
+    max-width: 380px;
+    width: calc(100% - 48px);
+}
+
+.toast {
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 18px;
+    border-radius: 16px;
+    font-family: 'Kanit', sans-serif;
+    font-size: 0.92rem;
+    font-weight: 500;
+    color: #ffffff;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    animation: toastIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    transition: all 0.35s ease;
+}
+
+@keyframes toastIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px) scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.toast.success {
+    background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.toast.error {
+    background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.toast.warning {
+    background: linear-gradient(135deg, #d97706 0%, #f59e0b 100%);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.toast.info {
+    background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.toast-close-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: #ffffff;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.2s ease;
+}
+
+.toast-close-btn:hover {
+    background: rgba(255, 255, 255, 0.4);
+}
+
+/* =====================================================
+   Utility & Helper Classes (Refactored Inline Styles)
+   ===================================================== */
+.w-full { width: 100%; }
+.mt-10 { margin-top: 10px; }
+.mb-14 { margin-bottom: 14px; }
+
+.form-subtitle-desc {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    margin-bottom: 18px;
+}
+
+.remark-modal-desc-danger {
+    color: var(--danger-color);
+    font-weight: 500;
+}
+
+/* Home Shortcut Banner to Student Check-in Page */
+.home-shortcut-container {
+    width: 100%;
+}
+
+.btn-home-shortcut {
+    width: 100%;
+    background: linear-gradient(135deg, var(--theme-light) 0%, #bae6fd 100%);
+    border: 1.5px solid var(--border-color);
+    border-radius: 20px;
+    padding: 16px 22px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    transition: var(--transition-smooth);
+    font-family: 'Kanit', sans-serif;
+}
+
+.btn-home-shortcut:hover {
+    background: linear-gradient(135deg, #bae6fd 0%, #7dd3fc 100%);
+    border-color: var(--primary-color);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(11,87,147,0.15);
+}
+
+.shortcut-text {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.shortcut-icon {
+    font-size: 1.3rem;
+}
+
+.shortcut-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--theme-dark);
+}
+
+.shortcut-link-text {
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: var(--primary-color);
+}

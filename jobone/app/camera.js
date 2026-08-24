@@ -111,6 +111,16 @@ function displayPhotoPreview(src, context) {
         photoPreviewImg.src = src;
         photoPreviewContainer.classList.remove('hidden');
         btnCameraTrigger.innerHTML = '<span>ถ่ายใหม่</span>';
+    } else if (context === 'home_checkin') {
+        currentCheckinPhoto = src;
+        if (typeof onHomeCheckinPhotoCaptured === 'function') {
+            onHomeCheckinPhotoCaptured(src);
+        }
+    } else if (context === 'home_checkout') {
+        currentCheckinPhoto = src;
+        if (typeof onHomeCheckoutPhotoCaptured === 'function') {
+            onHomeCheckoutPhotoCaptured(src);
+        }
     } else {
         currentCheckinPhoto = src;
         checkinPhotoPreview.src = src;

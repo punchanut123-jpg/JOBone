@@ -13,7 +13,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="standalone-mode">
 <div class="app-container">
 
     <!-- Overlay for mobile sidebar -->
@@ -45,11 +45,11 @@
             </div>
         </div>
         <nav class="menu-list">
-            <button id="tab-register" class="tab-btn active" onclick="switchTab('register'); toggleSidebar(false)">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
-                ลงทะเบียน
+            <button id="tab-home" class="tab-btn" onclick="switchTab('home'); toggleSidebar(false)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                หน้าหลัก (นักศึกษา)
             </button>
-            <button id="tab-checkin" class="tab-btn" onclick="switchTab('checkin'); toggleSidebar(false)">
+            <button id="tab-student-checkin" class="tab-btn" onclick="switchTab('student-checkin'); toggleSidebar(false)">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                 ลงเวลา
             </button>
@@ -57,7 +57,15 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                 ประวัติลงเวลา
             </button>
-            <button id="tab-report" class="tab-btn" onclick="switchTab('report'); toggleSidebar(false)">
+            <button id="tab-register" class="tab-btn active" style="display: none;" onclick="switchTab('register'); toggleSidebar(false)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+                ลงทะเบียน
+            </button>
+            <button id="tab-checkin" class="tab-btn" style="display: none;" onclick="switchTab('checkin'); toggleSidebar(false)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                ลงเวลา (แอดมิน)
+            </button>
+            <button id="tab-report" class="tab-btn" style="display: none;" onclick="switchTab('report'); toggleSidebar(false)">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                 รายงาน
                 <span id="record-count" class="badge">0</span>
@@ -67,6 +75,145 @@
 
     <!-- Main Content Area -->
     <main class="content-area">
+
+        <!-- ==================== VIEW 0: STUDENT HOME ==================== -->
+        <div id="view-home" class="view-content">
+            <!-- State A: Student Login Form -->
+            <div id="student-login-container" class="mobile-frame hidden">
+                <div class="card-inner">
+                    <h1 class="form-title">เข้าสู่ระบบนักศึกษา</h1>
+                    <p class="form-subtitle-desc">กรอกรหัสนักศึกษาและ PIN 8 หลัก เพื่อเข้าสู่หน้าหลัก</p>
+                    <form id="student-login-form" onsubmit="handleStudentLogin(event)">
+                        <div class="form-group">
+                            <label for="login-student-id" class="sr-only">รหัสนักศึกษา</label>
+                            <input type="text" id="login-student-id" class="form-input" placeholder="กรอกรหัสนักศึกษา" required autocomplete="off">
+                        </div>
+                        <div class="form-group">
+                            <label for="login-student-pin" class="sr-only">รหัส PIN 8 หลัก</label>
+                            <input type="password" id="login-student-pin" class="form-input" placeholder="กรอกรหัส PIN 8 หลัก" required autocomplete="off" inputmode="numeric" maxlength="8" pattern="\d{8}" title="กรุณากรอกตัวเลข 8 หลัก">
+                        </div>
+                        <div id="login-error" class="pin-error hidden mb-14" role="alert">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                            <span id="login-error-text">รหัสนักศึกษาหรือรหัส PIN ไม่ถูกต้อง</span>
+                        </div>
+                        <button type="submit" class="btn-submit">เข้าสู่ระบบ</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- State B: Student Home Dashboard (Shown when logged in) -->
+            <div id="student-dashboard-container" class="student-dashboard">
+                <!-- Student Profile Banner -->
+                <div class="student-profile-banner">
+                    <div class="student-profile-info">
+                        <img id="shome-photo" src="" alt="Student Profile" class="student-profile-avatar">
+                        <div class="student-profile-details">
+                            <h2 id="shome-name" class="student-profile-name">-</h2>
+                            <p id="shome-id" class="student-profile-id">รหัส: -</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Shortcut Card to Student Check-in -->
+                <div class="home-shortcut-container mb-16">
+                    <button class="btn-home-shortcut" onclick="switchTab('student-checkin')">
+                        <div class="shortcut-text">
+                            <span class="shortcut-icon">📍</span>
+                            <span class="shortcut-title">ลงเวลาเข้า-ออกงาน</span>
+                        </div>
+                        <span class="shortcut-link-text">ไปหน้าลงเวลา ➔</span>
+                    </button>
+                </div>
+
+                <!-- Today Status & Times Grid -->
+                <div class="home-status-grid">
+                    <!-- Card 1: Today Status -->
+                    <div class="home-card home-card-status">
+                        <div class="home-card-header">
+                            <span class="home-card-icon">📌</span>
+                            <span class="home-card-title">สถานะวันนี้</span>
+                        </div>
+                        <div class="home-card-body">
+                            <div id="shome-today-badge" class="today-status-pill status-none">ยังไม่ลงเวลา</div>
+                            <p id="shome-today-date" class="shome-subtext">วันที่ --/--/----</p>
+                        </div>
+                    </div>
+
+                    <!-- Card 2: Today Check-in / Check-out Times -->
+                    <div class="home-card home-card-times">
+                        <div class="home-card-header">
+                            <span class="home-card-icon">⏰</span>
+                            <span class="home-card-title">เวลาปฏิบัติงานวันนี้</span>
+                        </div>
+                        <div class="home-time-details">
+                            <div class="time-item">
+                                <span class="time-label">เวลาเข้างาน:</span>
+                                <span id="shome-checkin-time" class="time-value text-green">—</span>
+                            </div>
+                            <div class="time-item">
+                                <span class="time-label">เวลาออกงาน:</span>
+                                <span id="shome-checkout-time" class="time-value text-blue">—</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Monthly Summary Section -->
+                <div class="monthly-summary-section">
+                    <h3 class="section-title">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                        สรุปการลงเวลาประจำเดือน (<span id="shome-month-name">เดือนนี้</span>)
+                    </h3>
+                    <div class="dashboard-grid monthly-grid">
+                        <div class="stat-card stat-green">
+                            <div class="stat-icon">✅</div>
+                            <div class="stat-value" id="shome-month-ontime">0</div>
+                            <div class="stat-label">ตรงเวลา</div>
+                        </div>
+                        <div class="stat-card stat-orange">
+                            <div class="stat-icon">⚠️</div>
+                            <div class="stat-value" id="shome-month-late">0</div>
+                            <div class="stat-label">มาสาย</div>
+                        </div>
+                        <div class="stat-card stat-red">
+                            <div class="stat-icon">🚨</div>
+                            <div class="stat-value" id="shome-month-verylate">0</div>
+                            <div class="stat-label">สายมาก</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== VIEW: STUDENT CHECK-IN ==================== -->
+        <div id="view-student-checkin" class="view-content">
+            <div class="mobile-frame checkin-frame">
+                <div class="card-inner">
+                    <!-- Realtime Clock -->
+                    <div class="clock-display" id="sclock-display">
+                        <div id="sclock-time" class="clock-time">--:--:--</div>
+                        <div id="sclock-date" class="clock-date">--/--/----</div>
+                    </div>
+
+                    <!-- Time Window Indicator -->
+                    <div id="stime-window-indicator" class="time-window-indicator">
+                        <span id="stime-window-text">กำลังตรวจสอบเวลา...</span>
+                    </div>
+
+                    <h1 class="form-title">ลงเวลาเข้า-ออกงาน</h1>
+
+                    <!-- Smart Primary Action Button -->
+                    <div class="action-buttons" style="width: 100%;">
+                        <button id="btn-student-attendance" class="btn-home-attendance" onclick="handleHomeAttendanceAction()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="20" height="20" id="btn-student-icon">
+                                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                            </svg>
+                            <span id="btn-student-text">ลงเวลาเข้า</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <!-- ==================== VIEW 1: REGISTER ==================== -->
         <div id="view-register" class="view-content active">
@@ -83,8 +230,8 @@
                         <input type="text" id="student-id" class="form-input" placeholder="รหัสนักศึกษา" required autocomplete="off">
                     </div>
                     <div class="form-group">
-                        <label for="student-pin" class="sr-only">รหัส PIN 4 หลัก</label>
-                        <input type="password" id="student-pin" class="form-input" placeholder="กำหนดรหัส PIN 4 หลัก" required autocomplete="off" inputmode="numeric" maxlength="4" pattern="\d{4}" title="กรุณากรอกตัวเลข 4 หลัก">
+                        <label for="student-pin" class="sr-only">รหัส PIN 8 หลัก</label>
+                        <input type="password" id="student-pin" class="form-input" placeholder="กำหนดรหัส PIN 8 หลัก" required autocomplete="off" inputmode="numeric" maxlength="8" pattern="\d{8}" title="กรุณากรอกตัวเลข 8 หลัก">
                     </div>
                     <div class="photo-section">
                         <button type="button" id="btn-camera-trigger" class="btn-camera" onclick="openCameraModal('register')">
@@ -106,6 +253,11 @@
                     <div class="note-container">
                         <span class="note-title">หมายเหตุ...</span>
                         <p class="note-desc">กรุณากรอกข้อมูลให้ครบถ้วนและทำการถ่ายภาพเพื่อยืนยันตัวตนก่อนเข้าสู่ระบบ</p>
+                    </div>
+                    <div class="admin-login-link-container">
+                        <button type="button" class="btn-link-admin" onclick="openPinModal()">
+                            🔐 เข้าสู่ระบบสำหรับแอดมิน (อาจารย์)
+                        </button>
                     </div>
                 </form>
             </div>
@@ -289,8 +441,9 @@
                             <th>วันที่</th>
                             <th>เวลาเข้า</th>
                             <th>เวลาออก</th>
+                            <th>เวลาทำงาน</th>
                             <th>สถานะ</th>
-                            <th>หมายเหตุ</th>
+                            <th>หมายเหตุ / เหตุผลออกช้า</th>
                             <th>รูปเข้า</th>
                             <th>รูปออก</th>
                             <th></th>
@@ -431,6 +584,35 @@
     </div>
 </div>
 
+<!-- ==================== LATE LEAVE REASON MODAL ==================== -->
+<div id="late-leave-modal" class="modal-overlay">
+    <div class="modal-content remark-modal-content">
+        <div class="modal-header">
+            <h3>⏰ ระบุเหตุผลการออกงานช้า (หลัง 18:00 น.)</h3>
+        </div>
+        <div class="remark-modal-body">
+            <p class="remark-modal-desc remark-modal-desc-danger">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                เนื่องจากขณะนี้เลยเวลา 18:00 น. กรุณาระบุเหตุผลการออกงานช้า
+            </p>
+            <textarea id="late-leave-textarea" class="remark-textarea" placeholder="พิมพ์เหตุผลที่ออกงานช้าที่นี่..." rows="3"></textarea>
+            <div class="quick-remarks">
+                <span class="quick-remark-label">เลือกด่วน:</span>
+                <button type="button" class="quick-remark-btn" onclick="setQuickLateReason('เคลียร์เอกสาร')">เคลียร์เอกสาร</button>
+                <button type="button" class="quick-remark-btn" onclick="setQuickLateReason('ติดประชุม')">ติดประชุม</button>
+                <button type="button" class="quick-remark-btn" onclick="setQuickLateReason('งานยังไม่เสร็จ')">งานยังไม่เสร็จ</button>
+                <button type="button" class="quick-remark-btn" onclick="setQuickLateReason('โอที')">โอที</button>
+            </div>
+            <div id="late-leave-error" class="pin-error hidden mt-10">
+                <span>⚠️ กรุณากรอกเหตุผลที่ออกงานช้าก่อนบันทึก</span>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn-remark-save w-full" onclick="submitLateLeaveReason()">บันทึกและลงเวลาออก</button>
+        </div>
+    </div>
+</div>
+
 <!-- ==================== PHOTO VIEW MODAL ==================== -->
 <div id="photo-modal" class="modal-overlay" onclick="closePhotoModal()">
     <div class="modal-content photo-modal-content" onclick="event.stopPropagation()">
@@ -472,12 +654,14 @@
                 <span class="pin-dot"></span>
                 <span class="pin-dot"></span>
                 <span class="pin-dot"></span>
+                <span class="pin-dot"></span>
+                <span class="pin-dot"></span>
             </div>
 
             <!-- Hidden actual input -->
             <label for="pin-input" class="sr-only">รหัส PIN</label>
             <input type="password" id="pin-input" class="pin-hidden-input"
-                inputmode="numeric" maxlength="6" autocomplete="off"
+                inputmode="numeric" maxlength="8" autocomplete="off"
                 title="รหัส PIN" placeholder="รหัส PIN"
                 oninput="onPinInput(event)" onkeydown="if(event.key==='Enter') submitPin()">
             <input type="hidden" id="pin-tab-target" value="report">
@@ -583,15 +767,15 @@
         <div class="change-pin-body">
             <div>
                 <label for="cfg-old-pin" class="pin-form-label">รหัส PIN เดิม:</label>
-                <input type="password" id="cfg-old-pin" class="form-input" placeholder="กรอกรหัสเดิม (เริ่มต้น 1234)" maxlength="6" inputmode="numeric" autocomplete="off">
+                <input type="password" id="cfg-old-pin" class="form-input" placeholder="กรอกรหัสเดิม (เริ่มต้น 12345678)" maxlength="8" inputmode="numeric" autocomplete="off">
             </div>
             <div>
                 <label for="cfg-new-pin" class="pin-form-label">รหัส PIN ใหม่:</label>
-                <input type="password" id="cfg-new-pin" class="form-input" placeholder="กรอกรหัสใหม่ (ตัวเลข 4-6 หลัก)" maxlength="6" inputmode="numeric" autocomplete="off">
+                <input type="password" id="cfg-new-pin" class="form-input" placeholder="กรอกรหัสใหม่ (ตัวเลข 8 หลัก)" maxlength="8" inputmode="numeric" autocomplete="off">
             </div>
             <div>
                 <label for="cfg-confirm-pin" class="pin-form-label">ยืนยันรหัส PIN ใหม่:</label>
-                <input type="password" id="cfg-confirm-pin" class="form-input" placeholder="กรอกรหัสใหม่ซ้ำอีกครั้ง" maxlength="6" inputmode="numeric" autocomplete="off">
+                <input type="password" id="cfg-confirm-pin" class="form-input" placeholder="กรอกรหัสใหม่ซ้ำอีกครั้ง" maxlength="8" inputmode="numeric" autocomplete="off">
             </div>
         </div>
         <div class="modal-footer change-pin-footer">
@@ -609,30 +793,8 @@
             <button class="modal-close" onclick="closeStudentHistoryModal()">✕</button>
         </div>
         
-        <!-- Form Container -->
-        <div id="sh-form-container" class="sh-form-container">
-            <form id="student-history-form" onsubmit="submitStudentHistory(event)">
-                <div class="form-group sh-form-group">
-                    <label for="sh-student-id" class="pin-form-label">รหัสนักศึกษา:</label>
-                    <input type="text" id="sh-student-id" class="form-input" placeholder="กรอกรหัสนักศึกษา" required autocomplete="off">
-                </div>
-                <div class="form-group sh-form-group">
-                    <label for="sh-student-pin" class="pin-form-label">รหัส PIN 4 หลัก:</label>
-                    <input type="password" id="sh-student-pin" class="form-input" placeholder="กรอกรหัส PIN 4 หลัก" required autocomplete="off" inputmode="numeric" maxlength="4" pattern="\d{4}" title="กรุณากรอกตัวเลข 4 หลัก">
-                </div>
-                <div id="sh-error" class="pin-error hidden" role="alert">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                    <span id="sh-error-text">รหัส PIN หรือรหัสนักศึกษาไม่ถูกต้อง</span>
-                </div>
-                <div class="modal-footer sh-modal-footer">
-                    <button type="button" class="btn-remark-cancel" onclick="closeStudentHistoryModal()">ยกเลิก</button>
-                    <button type="submit" class="btn-remark-save">ยืนยัน</button>
-                </div>
-            </form>
-        </div>
-
         <!-- Result Container (History View) -->
-        <div id="sh-result-container" class="sh-result-container hidden">
+        <div id="sh-result-container" class="sh-result-container">
             <div class="ind-modal-profile sh-profile-header">
                 <img id="sh-student-photo" src="" alt="Student Profile" class="ind-modal-photo">
                 <div>
@@ -662,7 +824,7 @@
             </div>
 
             <div class="modal-footer sh-result-footer">
-                <button type="button" class="btn-remark-cancel" onclick="backToHistoryForm()">ย้อนกลับ</button>
+                <button type="button" class="btn-remark-cancel" onclick="closeStudentHistoryModal()">ปิด</button>
             </div>
         </div>
     </div>

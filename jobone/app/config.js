@@ -19,6 +19,26 @@ let clockInterval           = null;
 let devPanelClickCount      = 0;
 let isCheckingInVeryLate    = false;
 let isAdminAuthenticated    = false; 
+let currentStudentAuth      = null;
+
+function getStoredStudentAuth() {
+    try {
+        const data = localStorage.getItem('jobone_student_auth');
+        return data ? JSON.parse(data) : null;
+    } catch(e) {
+        return null;
+    }
+}
+
+function setStoredStudentAuth(authData) {
+    currentStudentAuth = authData;
+    localStorage.setItem('jobone_student_auth', JSON.stringify(authData));
+}
+
+function clearStoredStudentAuth() {
+    currentStudentAuth = null;
+    localStorage.removeItem('jobone_student_auth');
+}
 
 // ตัวแปรเก็บค่าช่วงเวลาทำงาน
 let timeConfig = {
@@ -31,13 +51,13 @@ let timeConfig = {
 
 // 🌐 ชุดรหัสกุญแจเชื่อมต่อคลาวด์ Firebase Firestore 
 const firebaseConfig = {
-    apiKey: "AIzaSyBLZpdxQywsdtVEip1Ups7iiHRGzSGqNfo",
-    authDomain: "job-one-b3179.firebaseapp.com",
-    projectId: "job-one-b3179",
-    storageBucket: "job-one-b3179.firebasestorage.app",
-    messagingSenderId: "501813633725",
-    appId: "1:501813633725:web:95df7658485504ca670dd4",
-    measurementId: "G-P9F1NRK7CH"
+    apiKey: "AIzaSyDDn9I3C6fNY8Ogch2DmpoPv_Kj32S3CqQ",
+    authDomain: "jobone-207da.firebaseapp.com",
+    projectId: "jobone-207da",
+    storageBucket: "jobone-207da.firebasestorage.app",
+    messagingSenderId: "1091330070684",
+    appId: "1:1091330070684:web:106008074683cb04b77559",
+    measurementId: "G-17KDDZJ490"
 };
 
 // กำหนดค่า Firebase
