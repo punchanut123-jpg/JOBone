@@ -17,9 +17,10 @@ let currentLookedUpStudent  = null;
 let devModeActive           = false;
 let clockInterval           = null;
 let devPanelClickCount      = 0;
-let isCheckingInVeryLate    = false;
 let isAdminAuthenticated    = false; 
 let currentStudentAuth      = null;
+let pendingLateLeaveAttachment = '';
+let lastGeolocationError = '';
 
 function getStoredStudentAuth() {
     try {
@@ -40,13 +41,9 @@ function clearStoredStudentAuth() {
     localStorage.removeItem('jobone_student_auth');
 }
 
-// ตัวแปรเก็บค่าช่วงเวลาทำงาน
+// ตัวแปรเก็บค่าเดดไลน์ออกงาน
 let timeConfig = {
-    ciOpen: '07:00',
-    ciOntime: '08:00',
-    ciClose: '08:30',
-    coOpen: '16:30',
-    coClose: '17:00'
+    checkoutDeadline: '18:00'
 };
 
 // 🌐 ชุดรหัสกุญแจเชื่อมต่อคลาวด์ Firebase Firestore 
@@ -66,7 +63,7 @@ const db = firebase.firestore();
 
 // 📍 พิกัดศูนย์กลางตึกคณะและรัศมี Geofence
 const facultyLocation = {
-    lat: 13.073356,
-    lng: 99.977877
+    lat: 13.0733216,
+    lng: 99.9780291
 };
 const GEOFENCE_RADIUS_METERS = 100; // รัศมีอนุญาต 100 เมตร

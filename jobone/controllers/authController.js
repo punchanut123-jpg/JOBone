@@ -18,8 +18,8 @@ exports.registerUser = async (req, res) => {
 
   // 2. Student ID Validation (Defense in Depth ที่ Backend)
   if (studentId) {
-    if (!/^6\d{10}$/.test(studentId)) {
-      return res.status(400).json({ error: 'รหัสนักศึกษาต้องเป็นตัวเลข 11 หลัก และขึ้นต้นด้วยเลข 6 เท่านั้น' });
+    if (!/^6\d{8}$/.test(studentId)) {
+      return res.status(400).json({ error: 'รหัสนักศึกษาต้องเป็นตัวเลข 9 หลัก และขึ้นต้นด้วยเลข 6 เท่านั้น' });
     }
     
     const existingStudent = await prisma.user.findUnique({ where: { studentId } });

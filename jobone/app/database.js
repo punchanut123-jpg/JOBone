@@ -5,8 +5,17 @@
 // 📍 ฟังก์ชันดึงพิกัด GPS ปัจจุบันของผู้ใช้งาน
 function getGPSLocation() {
     return new Promise((resolve) => {
+        lastGeolocationError = '';
         if (!navigator.geolocation) {
-            console.warn("เบราว์เซอร์นี้ไม่รองรับ Geolocation");
+            lastGeolocationError = 'เบราว์เซอร์นี้ไม่รองรับการระบุตำแหน่ง';
+            console.warn(lastGeolocationError);
+            resolve(null);
+            return;
+        }
+        const isLocalhost = ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
+        if (!window.isSecureContext && !isLocalhost) {
+            lastGeolocationError = 'ต้องเปิดระบบผ่าน HTTPS หรือ localhost จึงจะใช้ตำแหน่งได้';
+            console.warn(lastGeolocationError, window.location.href);
             resolve(null);
             return;
         }
@@ -15,10 +24,16 @@ function getGPSLocation() {
                 resolve({ lat: position.coords.latitude, lng: position.coords.longitude });
             },
             (error) => {
-                console.warn("ไม่สามารถดึงพิกัด GPS ได้:", error);
+                const messages = {
+                    1: 'ไม่ได้รับอนุญาตให้เข้าถึงตำแหน่ง โปรดกด Allow ที่ไอคอนแม่กุญแจข้าง URL',
+                    2: 'ไม่พบตำแหน่งปัจจุบัน โปรดเปิด Location/GPS แล้วลองใหม่',
+                    3: 'ค้นหาตำแหน่งไม่ทันเวลา โปรดลองใหม่อีกครั้งในบริเวณสัญญาณดี'
+                };
+                lastGeolocationError = messages[error.code] || 'ไม่สามารถอ่านตำแหน่งปัจจุบันได้';
+                console.warn(lastGeolocationError, error);
                 resolve(null);
             },
-            { enableHighAccuracy: true, timeout: 6000, maximumAge: 0 }
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
     });
 }
@@ -70,6 +85,7 @@ async function handleRegister(event) {
     const pin       = document.getElementById('student-pin').value.trim();
 
     if (!username || !studentId || !pin) { showToast('กรุณากรอกข้อมูลให้ครบถ้วน', 'error'); return; }
+    if (!/^6\d{8}$/.test(studentId)) { showToast('รหัสนักศึกษาต้องเป็นตัวเลข 9 หลัก และขึ้นต้นด้วย 6', 'error'); return; }
     if (pin.length !== 8 || isNaN(pin)) { showToast('กรุณาระบุรหัส PIN เป็นตัวเลข 8 หลัก', 'error'); return; }
     if (!currentPhotoBase64) { showToast('กรุณาถ่ายรูปเพื่อยืนยันตัวตน', 'error'); return; }
     if (dbStudents.some(s => s.studentId === studentId)) { showToast('รหัสนักศึกษานี้ลงทะเบียนไปแล้ว', 'error'); return; }
@@ -113,7 +129,7 @@ async function handleRegister(event) {
 }
 
 // 📌 บันทึกเวลาเข้างาน (ช่วงเช้า) พร้อมเก็บ GPS
-async function saveAutoCheckinRecord(student, status, remark) {
+async function saveAutoCheckinRecord(student, remark = '') {
     const now = new Date();
     const timeStr = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false });
 
@@ -126,7 +142,6 @@ async function saveAutoCheckinRecord(student, status, remark) {
         date: getTodayDateStr(),   
         checkIn: timeStr,
         checkOut: '',
-        status: status,
         remark: remark,
         checkInPhoto: currentCheckinPhoto || '',
         checkOutPhoto: '',
@@ -179,11 +194,31 @@ function calculateWorkDuration(checkInStr, checkOutStr) {
     return `${mins} นาที`;
 }
 
+async function getValidatedAttendanceLocation(actionText) {
+    const location = await getGPSLocation();
+
+    if (!devModeActive && location) {
+        const distance = getDistanceInMeters(
+            location.lat, location.lng,
+            facultyLocation.lat, facultyLocation.lng
+        );
+        if (distance > GEOFENCE_RADIUS_METERS) {
+            showToast(`🚫 คุณอยู่นอกพื้นที่คณะ ไม่สามารถลงเวลา${actionText}ได้ กรุณาอยู่ในรัศมี ${GEOFENCE_RADIUS_METERS} เมตรจากคณะ`, 'error', 5000);
+            return { allowed: false, location: null };
+        }
+    } else if (!devModeActive && !location) {
+        showToast(`⚠️ ${lastGeolocationError || 'ไม่สามารถตรวจสอบตำแหน่งได้ โปรดเปิด GPS แล้วลองใหม่'}`, 'warning', 6000);
+        return { allowed: false, location: null };
+    }
+
+    return { allowed: true, location };
+}
+
 // 🔵 ฟังก์ชันส่วนกลางสำหรับอัปเดตเวลาออกงานพร้อมคำนวณเวลาทำงานและเหตุผลออกช้า
-async function saveStudentCheckoutRecord(studentId, photoBase64, lateLeaveReason = '') {
+async function saveStudentCheckoutRecord(studentId, photoBase64, lateLeaveReason = '', lateLeaveAttachment = '') {
     const rec = getTodayRecord(studentId);
     if (!rec) { showToast('ยังไม่ได้ลงเวลาเข้างานวันนี้', 'error'); return null; }
-    if (rec.checkOut || rec.status === 'checked_out') { showToast('คุณได้ลงเวลาออกงานวันนี้แล้ว', 'warning'); return null; }
+    if (rec.checkOut) { showToast('คุณได้ลงเวลาออกงานวันนี้แล้ว', 'warning'); return null; }
 
     const idx = dbAttendance.findIndex(r => r.studentId === studentId && r.date === rec.date);
     if (idx === -1 || !dbAttendance[idx]._docId) { showToast('❌ ไม่พบรหัสอ้างอิงคลาวด์', 'error'); return null; }
@@ -191,19 +226,21 @@ async function saveStudentCheckoutRecord(studentId, photoBase64, lateLeaveReason
     const timeStr = new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false });
     const docId   = dbAttendance[idx]._docId;
 
-    showToast('📍 กำลังดึงพิกัดตำแหน่ง...', 'info', 1500);
-    const location = await getGPSLocation();
+    showToast('📍 กำลังตรวจสอบตำแหน่งสถานที่...', 'info', 1500);
+    const locationCheck = await getValidatedAttendanceLocation('ออกงาน');
+    if (!locationCheck.allowed) return null;
+    const location = locationCheck.location;
 
     const duration = calculateWorkDuration(rec.checkIn, timeStr);
 
     const cloudUpdate = {
         checkOut: timeStr,
         checkOutPhoto: photoBase64 || currentCheckinPhoto || '',
-        status: 'checked_out',
         checkOutLocation: location || null,
         workDuration: duration
     };
     if (lateLeaveReason) cloudUpdate.lateLeaveReason = lateLeaveReason;
+    if (lateLeaveAttachment) cloudUpdate.lateLeaveAttachment = lateLeaveAttachment;
     if (currentRemark && !dbAttendance[idx].remark) cloudUpdate.remark = currentRemark;
 
     try {
@@ -212,10 +249,10 @@ async function saveStudentCheckoutRecord(studentId, photoBase64, lateLeaveReason
         
         dbAttendance[idx].checkOut          = timeStr;
         dbAttendance[idx].checkOutPhoto     = photoBase64 || currentCheckinPhoto || '';
-        dbAttendance[idx].status            = 'checked_out';
         dbAttendance[idx].checkOutLocation  = location || null;
         dbAttendance[idx].workDuration      = duration;
         if (lateLeaveReason) dbAttendance[idx].lateLeaveReason = lateLeaveReason;
+        if (lateLeaveAttachment) dbAttendance[idx].lateLeaveAttachment = lateLeaveAttachment;
         if (cloudUpdate.remark) dbAttendance[idx].remark = currentRemark;
 
         localStorage.setItem('attendanceRecords', JSON.stringify(dbAttendance));
@@ -235,13 +272,6 @@ async function saveStudentCheckoutRecord(studentId, photoBase64, lateLeaveReason
 // 🔵 อัปเดตเวลาออกงาน (ตอนเย็น) สำหรับหน้าเดิม
 async function handleCheckOut() {
     if (!currentLookedUpStudent) return;
-    const now = getNowMinutes();
-    const CO_OPEN  = strToMinutes(timeConfig.coOpen);
-    const CO_CLOSE = strToMinutes(timeConfig.coClose);
-
-    if (!devModeActive && !(now >= CO_OPEN && now <= CO_CLOSE)) {
-        showToast(`ไม่อยู่ในช่วงเวลาลงเวลาออกงาน`, 'error'); return;
-    }
     if (!currentCheckinPhoto) { showToast('กรุณาถ่ายรูปยืนยันตัวตน', 'error'); return; }
 
     await saveStudentCheckoutRecord(currentLookedUpStudent.studentId, currentCheckinPhoto);
@@ -333,12 +363,9 @@ async function clearAllData() {
 }
 
 function buildExcelData() {
-    const header = ['ลำดับ', 'ชื่อ-นามสกุล', 'รหัสนักศึกษา', 'วันที่ปฏิบัติงาน', 'เวลาเข้างาน', 'เวลาออกงาน', 'เวลาทำงานรวม', 'สถานะการเข้างาน', 'เหตุผลการมาสาย', 'เหตุผลออกช้า', 'ถ่ายรูปเข้างาน', 'ถ่ายรูปออกงาน'];
+    const header = ['ลำดับ', 'ชื่อ-นามสกุล', 'รหัสนักศึกษา', 'วันที่ปฏิบัติงาน', 'เวลาเข้างาน', 'เวลาออกงาน', 'เวลาทำงานรวม', 'สถานะ', 'หมายเหตุ', 'เหตุผลออกช้า', 'ถ่ายรูปเข้างาน', 'ถ่ายรูปออกงาน'];
     const rows = dbAttendance.map((rec, i) => {
-        let displayStatus = 'ตรงเวลา (On Time)';
-        if (rec.status === 'checked_out' || rec.checkOut) displayStatus = 'ออกงานแล้ว (Checked Out)';
-        else if (rec.status === 'verylate') displayStatus = 'สายมาก (Very Late)';
-        else if (rec.status === 'late') displayStatus = 'มาสาย (Late)';
+        const displayStatus = rec.checkOut ? 'ออกงานแล้ว' : 'ยังไม่ออกงาน';
         return [
             i + 1, rec.name || rec.username || '—', rec.studentId, formatDisplayDate(rec.date),
             rec.checkIn || '—', rec.checkOut || '—', rec.workDuration || '—', displayStatus,
@@ -431,13 +458,9 @@ async function restoreDataFromJSON(event) {
 
 function getStudentStatsAndHistory(studentId) {
     const personalHistory = dbAttendance.filter(record => record.studentId === studentId);
-    let countOnTime = 0, countLate = 0, countVeryLate = 0;
-    personalHistory.forEach(record => {
-        if (record.status === 'ontime') countOnTime++;
-        else if (record.status === 'late') countLate++;
-        else if (record.status === 'verylate') countVeryLate++;
-    });
-    return { studentId, totalRecords: personalHistory.length, stats: { onTime: countOnTime, late: countLate, veryLate: countVeryLate }, history: personalHistory };
+    const worked = personalHistory.filter(record => record.checkIn).length;
+    const lateLeave = personalHistory.filter(record => record.lateLeaveReason).length;
+    return { studentId, totalRecords: personalHistory.length, stats: { worked, lateLeave }, history: personalHistory };
 }
 
 function verifyAdminPIN(inputPIN) {

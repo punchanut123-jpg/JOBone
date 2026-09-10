@@ -2,43 +2,68 @@
 // 📸 camera.js - จัดการกล้องและรูปภาพ
 // ==========================================
 
-async function openCameraModal(context = 'register') {
-    cameraContext = context;
-    document.getElementById('camera-modal-title').textContent =
-        context === 'register' ? 'ถ่ายภาพเพื่อลงทะเบียน' : 'ถ่ายภาพยืนยันตัวตน';
+// Helper to get DOM elements dynamically to avoid any load sequence issues
+function getCameraDOM() {
+    return {
+        cameraModal: document.getElementById('camera-modal'),
+        fallbackUpload: document.getElementById('fallback-upload'),
+        webcamEl: document.getElementById('webcam'),
+        btnCapture: document.getElementById('btn-capture'),
+        photoCanvas: document.getElementById('photo-canvas'),
+        photoPreviewImg: document.getElementById('photo-preview'),
+        photoPreviewContainer: document.getElementById('photo-preview-container'),
+        btnCameraTrigger: document.getElementById('btn-camera-trigger'),
+        checkinPhotoPreview: document.getElementById('checkin-photo-preview'),
+        checkinPhotoPreviewCon: document.getElementById('checkin-photo-preview-container'),
+        btnCheckinCamera: document.getElementById('btn-checkin-camera'),
+        btnCheckout: document.getElementById('btn-checkout')
+    };
+}
 
-    cameraModal.classList.add('active');
-    fallbackUpload.classList.add('hidden');
-    webcamEl.classList.remove('hidden');
-    btnCapture.classList.remove('hidden');
+async function openCameraModal(context = 'register') {
+    const dom = getCameraDOM();
+    cameraContext = context;
+    if (document.getElementById('camera-modal-title')) {
+        document.getElementById('camera-modal-title').textContent =
+            context === 'register' ? 'ถ่ายภาพเพื่อลงทะเบียน' : 'ถ่ายภาพยืนยันตัวตน';
+    }
+
+    if (dom.cameraModal) dom.cameraModal.classList.add('active');
+    if (dom.fallbackUpload) dom.fallbackUpload.classList.add('hidden');
+    if (dom.webcamEl) dom.webcamEl.classList.remove('hidden');
+    if (dom.btnCapture) dom.btnCapture.classList.remove('hidden');
 
     try {
         const stream = await navigator.mediaDevices.getUserMedia({
             video: { facingMode: 'user', width: 640, height: 480 }, audio: false
         });
         streamInstance = stream;
-        webcamEl.setAttribute('playsinline', 'true');
-        webcamEl.setAttribute('webkit-playsinline', 'true');
-        webcamEl.srcObject = stream;
+        if (dom.webcamEl) {
+            dom.webcamEl.setAttribute('playsinline', 'true');
+            dom.webcamEl.setAttribute('webkit-playsinline', 'true');
+            dom.webcamEl.srcObject = stream;
+        }
     } catch (err) {
         console.warn('Camera error:', err);
-        webcamEl.classList.add('hidden');
-        btnCapture.classList.add('hidden');
-        fallbackUpload.classList.remove('hidden');
+        if (dom.webcamEl) dom.webcamEl.classList.add('hidden');
+        if (dom.btnCapture) dom.btnCapture.classList.add('hidden');
+        if (dom.fallbackUpload) dom.fallbackUpload.classList.remove('hidden');
     }
 }
 
 function closeCameraModal() {
-    cameraModal.classList.remove('active');
+    const dom = getCameraDOM();
+    if (dom.cameraModal) dom.cameraModal.classList.remove('active');
     stopWebcamStream();
 }
 
 function stopWebcamStream() {
+    const dom = getCameraDOM();
     if (streamInstance) {
         streamInstance.getTracks().forEach(t => t.stop());
         streamInstance = null;
     }
-    webcamEl.srcObject = null;
+    if (dom.webcamEl) dom.webcamEl.srcObject = null;
 }
 
 function compressImage(src, maxKB = 80, maxSize = 480) {
@@ -77,12 +102,13 @@ function compressImage(src, maxKB = 80, maxSize = 480) {
 }
 
 function capturePhoto() {
-    if (!streamInstance) return;
-    const ctx = photoCanvas.getContext('2d');
-    photoCanvas.width  = webcamEl.videoWidth  || 640;
-    photoCanvas.height = webcamEl.videoHeight || 480;
-    ctx.drawImage(webcamEl, 0, 0, photoCanvas.width, photoCanvas.height);
-    const raw = photoCanvas.toDataURL('image/jpeg', 0.92);
+    const dom = getCameraDOM();
+    if (!streamInstance || !dom.webcamEl || !dom.photoCanvas) return;
+    const ctx = dom.photoCanvas.getContext('2d');
+    dom.photoCanvas.width  = dom.webcamEl.videoWidth  || 640;
+    dom.photoCanvas.height = dom.webcamEl.videoHeight || 480;
+    ctx.drawImage(dom.webcamEl, 0, 0, dom.photoCanvas.width, dom.photoCanvas.height);
+    const raw = dom.photoCanvas.toDataURL('image/jpeg', 0.92);
     closeCameraModal();
 
     compressImage(raw).then(compressed => {
@@ -106,11 +132,19 @@ function handleFallbackFile(event) {
 }
 
 function displayPhotoPreview(src, context) {
+    const dom = getCameraDOM();
     if (context === 'register') {
         currentPhotoBase64 = src;
-        photoPreviewImg.src = src;
-        photoPreviewContainer.classList.remove('hidden');
-        btnCameraTrigger.innerHTML = '<span>ถ่ายใหม่</span>';
+        if (dom.photoPreviewImg) {
+            dom.photoPreviewImg.src = src;
+            dom.photoPreviewImg.classList.remove('hidden');
+        }
+        if (dom.photoPreviewContainer) dom.photoPreviewContainer.classList.remove('hidden');
+        if (dom.btnCameraTrigger) dom.btnCameraTrigger.textContent = 'แตะเพื่อถ่ายภาพใหม่';
+        
+        // Add class to camera widget
+        const widget = document.querySelector('.camera-widget');
+        if (widget) widget.classList.add('has-photo');
     } else if (context === 'home_checkin') {
         currentCheckinPhoto = src;
         if (typeof onHomeCheckinPhotoCaptured === 'function') {
@@ -123,26 +157,58 @@ function displayPhotoPreview(src, context) {
         }
     } else {
         currentCheckinPhoto = src;
-        checkinPhotoPreview.src = src;
-        checkinPhotoPreviewCon.classList.remove('hidden');
-        btnCheckinCamera.querySelector('span').textContent = 'ถ่ายใหม่';
-        updateActionButtons();
+        if (dom.checkinPhotoPreview) {
+            dom.checkinPhotoPreview.src = src;
+            dom.checkinPhotoPreview.classList.remove('hidden');
+        }
+        if (dom.checkinPhotoPreviewCon) dom.checkinPhotoPreviewCon.classList.remove('hidden');
+        if (dom.btnCheckinCamera) {
+            dom.btnCheckinCamera.textContent = 'แตะเพื่อถ่ายภาพใหม่';
+        }
+        
+        // Add class to checkin camera widget
+        const widget = document.getElementById('checkin-photo-section');
+        if (widget) widget.classList.add('has-photo');
+        
+        if (typeof updateActionButtons === 'function') {
+            updateActionButtons();
+        }
     }
 }
 
 function deletePhoto(context) {
+    const dom = getCameraDOM();
     if (context === 'register') {
         currentPhotoBase64 = null;
-        photoPreviewContainer.classList.add('hidden');
-        photoPreviewImg.src = '';
-        btnCameraTrigger.innerHTML = '<span>ถ่ายรูป</span>';
+        if (dom.photoPreviewContainer) dom.photoPreviewContainer.classList.add('hidden');
+        if (dom.photoPreviewImg) {
+            dom.photoPreviewImg.src = '';
+            dom.photoPreviewImg.classList.add('hidden');
+        }
+        if (dom.btnCameraTrigger) dom.btnCameraTrigger.textContent = 'แตะเพื่อถ่ายภาพ';
+        
+        // Remove class from camera widget
+        const widget = document.querySelector('.camera-widget');
+        if (widget) widget.classList.remove('has-photo');
         showToast('ลบรูปภาพแล้ว', 'warning');
     } else {
         currentCheckinPhoto = null;
-        checkinPhotoPreviewCon.classList.add('hidden');
-        checkinPhotoPreview.src = '';
-        btnCheckinCamera.querySelector('span').textContent = 'ถ่ายรูปยืนยัน';
+        if (dom.checkinPhotoPreviewCon) dom.checkinPhotoPreviewCon.classList.add('hidden');
+        if (dom.checkinPhotoPreview) {
+            dom.checkinPhotoPreview.src = '';
+            dom.checkinPhotoPreview.classList.add('hidden');
+        }
+        if (dom.btnCheckinCamera) {
+            dom.btnCheckinCamera.textContent = 'แตะเพื่อถ่ายภาพ';
+        }
+        
+        // Remove class from checkin camera widget
+        const widget = document.getElementById('checkin-photo-section');
+        if (widget) widget.classList.remove('has-photo');
+        
         showToast('ลบรูปภาพยืนยันแล้ว', 'warning');
-        updateActionButtons();
+        if (typeof updateActionButtons === 'function') {
+            updateActionButtons();
+        }
     }
 }

@@ -10,8 +10,8 @@ async function main() {
   });
 
   const invalidUsers = users.filter(user => {
-    // ตรวจสอบ format: ต้องเป็นตัวเลข 11 หลัก และขึ้นต้นด้วย 6
-    const isValidFormat = /^6\d{10}$/.test(user.studentId);
+    // ตรวจสอบ format: ต้องเป็นตัวเลข 9 หลัก และขึ้นต้นด้วย 6
+    const isValidFormat = /^6\d{8}$/.test(user.studentId);
     return !isValidFormat;
   });
 

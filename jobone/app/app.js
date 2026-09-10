@@ -8,6 +8,13 @@ const tabStudentCheckin         = document.getElementById('tab-student-checkin')
 const tabRegister               = document.getElementById('tab-register');
 const tabCheckin                = document.getElementById('tab-checkin');
 const tabReport                 = document.getElementById('tab-report');
+
+// Bottom Nav References
+const tabBottomHome             = document.getElementById('tab-bottom-home');
+const tabBottomStudentCheckin   = document.getElementById('tab-bottom-student-checkin');
+const tabBottomStudentHistory   = document.getElementById('tab-bottom-student-history');
+const tabBottomReport           = document.getElementById('tab-bottom-report');
+
 const viewHome                  = document.getElementById('view-home');
 const viewStudentCheckin        = document.getElementById('view-student-checkin');
 const viewRegister              = document.getElementById('view-register');
@@ -16,7 +23,59 @@ const viewReport                = document.getElementById('view-report');
 const studentLoginContainer     = document.getElementById('student-login-container');
 const studentDashboardContainer = document.getElementById('student-dashboard-container');
 const recordCount               = document.getElementById('record-count');
-const toastContainer            = document.getElementById('toast-container');
+let toastContainer               = document.getElementById('toast-container');
+
+// ── Theme Switcher Setup ──
+function initTheme() {
+    const savedTheme = localStorage.getItem('jobone_theme_mode') || 'light';
+    setTheme(savedTheme);
+}
+
+function setTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('jobone_theme_mode', theme);
+    updateThemeToggleIcons(theme);
+}
+
+function toggleTheme() {
+    const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+    const nextTheme = currentTheme === 'light' ? 'dark' : 'light';
+    setTheme(nextTheme);
+    showToast(nextTheme === 'dark' ? '🌙 เปลี่ยนเป็นธีมมืด (Dark Mode)' : '☀️ เปลี่ยนเป็นธีมสว่าง (Light Mode)', 'info', 2000);
+}
+
+// ── Sidebar Collapsible ──
+function initSidebar() {
+    const sidebar = document.getElementById('main-sidebar');
+    if (!sidebar) return;
+    // Only apply on desktop
+    if (window.innerWidth <= 768) return;
+    const isCollapsed = localStorage.getItem('jobone_sidebar_collapsed') === 'true';
+    if (isCollapsed) {
+        sidebar.classList.add('collapsed');
+    }
+}
+
+function toggleSidebar() {
+    const sidebar = document.getElementById('main-sidebar');
+    if (!sidebar) return;
+    const willCollapse = !sidebar.classList.contains('collapsed');
+    sidebar.classList.toggle('collapsed', willCollapse);
+    localStorage.setItem('jobone_sidebar_collapsed', String(willCollapse));
+}
+
+function updateThemeToggleIcons(theme) {
+    const btns = document.querySelectorAll('.theme-toggle-btn');
+    btns.forEach(btn => {
+        if (theme === 'dark') {
+            btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
+            btn.title = 'สลับเป็นธีมสว่าง (Light Mode)';
+        } else {
+            btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`;
+            btn.title = 'สลับเป็นธีมมืด (Dark Mode)';
+        }
+    });
+}
 
 // Camera modal
 const cameraModal    = document.getElementById('camera-modal');
@@ -63,6 +122,8 @@ const remarkTextarea    = document.getElementById('remark-textarea');
 
 // ── Init เมื่อโหลดหน้าเว็บเสร็จ ──
 document.addEventListener('DOMContentLoaded', async () => {
+    initTheme();
+    initSidebar();
     try {
         const configDoc = await db.collection('config').doc('settings').get();
         if (configDoc.exists) {
@@ -138,15 +199,7 @@ function strToMinutes(timeStr) {
 }
 
 function getTimeWindow() {
-    if (devModeActive) return 'dev';
-    const now = getNowMinutes();
-    const CI_OPEN = strToMinutes(timeConfig.ciOpen), CI_ONTIME = strToMinutes(timeConfig.ciOntime), CI_CLOSE = strToMinutes(timeConfig.ciClose);
-    const CO_OPEN = strToMinutes(timeConfig.coOpen), CO_CLOSE = strToMinutes(timeConfig.coClose);
-    if (now >= CI_OPEN && now <= CI_ONTIME) return 'ontime';
-    if (now > CI_ONTIME && now <= CI_CLOSE) return 'late';
-    if (now > CI_CLOSE && now < CO_OPEN) return 'verylate';
-    if (now >= CO_OPEN && now <= CO_CLOSE) return 'checkout';
-    return 'closed';
+    return 'open';
 }
 
 function updateTimeWindowUI(now) {
@@ -157,15 +210,7 @@ function updateTimeWindowUI(now) {
     if (timeWindowIndicator) timeWindowIndicator.className = 'time-window-indicator';
     if (stimeWindowIndicator) stimeWindowIndicator.className = 'time-window-indicator';
 
-    const statuses = {
-        'ontime':  { cls: 'window-open-in',   txt: `✅ เปิดรับลงเวลาเข้างาน (ตรงเวลา) ${timeConfig.ciOpen} – ${timeConfig.ciOntime} น.` },
-        'late':    { cls: 'window-open-late',  txt: `⚠️ เปิดรับลงเวลาเข้างาน (มาสาย) ${timeConfig.ciOntime} – ${timeConfig.ciClose} น.` },
-        'verylate':{ cls: 'window-closed',     txt: `🚨 ลงเวลาเข้างานสายมาก (ต้องระบุเหตุผล) หลัง ${timeConfig.ciClose} น.` },
-        'checkout':{ cls: 'window-open-out',   txt: `🔵 เปิดรับลงเวลาออกงาน ${timeConfig.coOpen} – ${timeConfig.coClose} น.` },
-        'closed':  { cls: 'window-closed',     txt: '🔒 นอกช่วงเวลาลงเวลา' },
-        'dev':     { cls: 'window-open-late',  txt: '🔧 Dev Mode: bypass เวลาเปิดอยู่' },
-    };
-    const s = statuses[win];
+    const s = { cls: 'window-open-in', txt: `🟢 ลงเวลาเข้าได้ตลอดเวลา | เดดไลน์ออกงาน ${timeConfig.checkoutDeadline || '18:00'} น.` };
     if (timeWindowIndicator) { timeWindowIndicator.classList.add(s.cls); }
     if (timeWindowText) { timeWindowText.textContent = s.txt; }
 
@@ -184,16 +229,20 @@ function toggleDevMode(active) {
 // ── Tab UI ──
 async function switchTab(tab) {
     if (tab === 'report' && !isAdminAuthenticated) { openPinModal(); return; }
-    const tabs  = { home: tabHome, 'student-checkin': tabStudentCheckin, register: tabRegister, checkin: tabCheckin, report: tabReport };
-    const views = { home: viewHome, 'student-checkin': viewStudentCheckin, register: viewRegister, checkin: viewCheckin, report: viewReport };
+    const tabs       = { home: tabHome, 'student-checkin': tabStudentCheckin, register: tabRegister, checkin: tabCheckin, report: tabReport };
+    const bottomTabs = { home: tabBottomHome, 'student-checkin': tabBottomStudentCheckin, report: tabBottomReport };
+    const views      = { home: viewHome, 'student-checkin': viewStudentCheckin, register: viewRegister, checkin: viewCheckin, report: viewReport };
 
-    // 🔒 ควบคุมการแสดงผล tab ใน Sidebar ตามสิทธิ์ผู้ใช้งาน
+    // 🔒 ควบคุมการแสดงผล tab ใน Sidebar และ Bottom Nav ตามสิทธิ์ผู้ใช้งาน
     const isStudentLoggedIn = !!getStoredStudentAuth();
     if (tabCheckin) {
         tabCheckin.style.display = isAdminAuthenticated ? 'flex' : 'none';
     }
     if (tabReport) {
         tabReport.style.display = isAdminAuthenticated ? 'flex' : 'none';
+    }
+    if (tabBottomReport) {
+        tabBottomReport.style.display = isAdminAuthenticated ? 'flex' : 'none';
     }
     if (tabRegister) {
         tabRegister.style.display = (isAdminAuthenticated || !isStudentLoggedIn) ? 'flex' : 'none';
@@ -202,9 +251,12 @@ async function switchTab(tab) {
         tabStudentCheckin.style.display = (isStudentLoggedIn && !isAdminAuthenticated) ? 'flex' : 'none';
     }
 
-    Object.values(tabs).forEach(t  => { if (t) t.classList.remove('active'); });
+    Object.values(tabs).forEach(t => { if (t) t.classList.remove('active'); });
+    Object.values(bottomTabs).forEach(t => { if (t) t.classList.remove('active'); });
     Object.values(views).forEach(v => { if (v) v.classList.remove('active'); });
+
     if (tabs[tab]) tabs[tab].classList.add('active');
+    if (bottomTabs[tab]) bottomTabs[tab].classList.add('active');
     if (views[tab]) views[tab].classList.add('active');
 
     if (tab === 'home') {
@@ -219,10 +271,18 @@ async function switchTab(tab) {
 
 // ── Toast UI ──
 function showToast(message, type = 'success', duration = 3500) {
+    let container = document.getElementById('toast-container') || toastContainer;
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-container';
+        container.className = 'toast-container';
+        document.body.appendChild(container);
+        toastContainer = container;
+    }
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
     toast.innerHTML = `<span>${message}</span><button class="toast-close-btn" onclick="this.parentElement.remove()">✕</button>`;
-    toastContainer.appendChild(toast);
+    container.appendChild(toast);
     setTimeout(() => { toast.style.opacity = '0'; toast.style.transform = 'translateY(10px)'; setTimeout(() => toast.remove(), 350); }, duration);
 }
 
@@ -233,7 +293,7 @@ function getTodayRecord(studentId) { const today = getTodayDateStr(); return dbA
 // ── ค้นหานักศึกษาและการลงเวลา UI ──
 function lookupStudent() {
     const id = checkinStudentId.value.trim();
-    currentLookedUpStudent = null; currentCheckinPhoto = null; currentRemark = ''; isCheckingInVeryLate = false;
+    currentLookedUpStudent = null; currentCheckinPhoto = null; currentRemark = '';
     updateRemarkUI(); studentInfoCard.classList.add('hidden'); studentNotFound.classList.add('hidden');
     checkinPhotoSection.classList.add('hidden'); checkinPhotoPreviewCon.classList.add('hidden');
     remarkSection.classList.add('hidden'); actionButtons.classList.add('hidden');
@@ -249,7 +309,7 @@ function lookupStudent() {
     const rec = getTodayRecord(found.studentId);
     if (rec) {
         updateTodayStatusPill(found.studentId); showToast('วันนี้คุณได้ลงเวลาเข้าแล้ว', 'warning');
-        if (rec.status !== 'checked_out') {
+        if (!rec.checkOut) {
             checkinPhotoSection.classList.remove('hidden'); remarkSection.classList.remove('hidden');
             actionButtons.classList.remove('hidden'); btnCheckout.classList.remove('hidden'); updateActionButtons();
         }
@@ -259,41 +319,13 @@ function lookupStudent() {
 }
 
 async function triggerAutoCheckin(student) {
-    const now = new Date();
-    const currentMin = now.getHours() * 60 + now.getMinutes();
-    const CI_OPEN    = strToMinutes(timeConfig.ciOpen);
-    const CI_LATE    = strToMinutes(timeConfig.ciOntime);
-    const CI_VERYLATE = strToMinutes(timeConfig.ciClose);
-
     // 1. ตรวจสอบพื้นที่ด้วย GPS ก่อนลงเวลา
     showToast('📍 กำลังตรวจสอบตำแหน่งสถานที่...', 'info', 2000);
-    const location = await getGPSLocation();
+    const locationCheck = await getValidatedAttendanceLocation('เข้า');
+    if (!locationCheck.allowed) return;
 
-    if (!devModeActive && location) {
-        const distance = getDistanceInMeters(
-            location.lat, location.lng,
-            facultyLocation.lat, facultyLocation.lng
-        );
-        if (distance > GEOFENCE_RADIUS_METERS) {
-            showToast(`🚫 ลงเวลาไม่ได้! คุณอยู่นอกพื้นที่คณะ (ห่าง ${Math.round(distance)} เมตร)`, 'error', 5000);
-            return;
-        }
-    } else if (!devModeActive && !location) {
-        showToast('⚠️ ไม่สามารถตรวจสอบตำแหน่งได้ โปรดเปิด GPS แล้วลองใหม่', 'warning', 4000);
-        return;
-    }
-
-    // 2. ผ่านเงื่อนไขพื้นที่แล้ว → ตรวจสอบช่วงเวลาและบันทึก
-    if (!devModeActive && currentMin < CI_OPEN) {
-        showToast(`🔒 ยังไม่เปิดให้ลงเวลาเข้างาน (เปิด ${timeConfig.ciOpen} น.)`, 'error'); return;
-    }
-    if (devModeActive || (currentMin >= CI_OPEN && currentMin <= CI_LATE)) {
-        saveAutoCheckinRecord(student, 'ontime', '');
-    } else if (currentMin > CI_LATE && currentMin <= CI_VERYLATE) {
-        saveAutoCheckinRecord(student, 'late', '');
-    } else {
-        isCheckingInVeryLate = true; currentLookedUpStudent = student; openRemarkModal();
-    }
+    // 2. ผ่านเงื่อนไขพื้นที่แล้ว → ลงเวลาเข้าได้ทุกเวลา
+    saveAutoCheckinRecord(student, '');
 }
 
 function handleCheckIn() { /* Auto check-in is used */ }
@@ -307,28 +339,20 @@ function updateTodayStatusPill(studentId) {
     const rec = getTodayRecord(studentId);
     studentTodayStatus.className = 'today-status-pill';
     if (!rec) { studentTodayStatus.classList.add('status-none'); studentTodayStatus.textContent = 'ยังไม่ลงเวลา'; }
-    else if (rec.status === 'checked_out') { studentTodayStatus.classList.add('status-checkout'); studentTodayStatus.textContent = `ออกงานแล้ว ${rec.checkOut} น.`; }
-    else if (rec.status === 'verylate') { studentTodayStatus.classList.add('status-verylate'); studentTodayStatus.textContent = `สายมาก — ${rec.checkIn} น.`; }
-    else if (rec.status === 'late') { studentTodayStatus.classList.add('status-late'); studentTodayStatus.textContent = `มาสาย — ${rec.checkIn} น.`; }
-    else { studentTodayStatus.classList.add('status-ontime'); studentTodayStatus.textContent = `ตรงเวลา — ${rec.checkIn} น.`; }
+    else if (rec.checkOut) { studentTodayStatus.classList.add('status-checkout'); studentTodayStatus.textContent = `ออกงานแล้ว ${rec.checkOut} น.`; }
+    else { studentTodayStatus.classList.add('status-ontime'); studentTodayStatus.textContent = `เข้างานแล้ว ${rec.checkIn} น.`; }
 }
 
 function updateActionButtons() {
     if (!currentLookedUpStudent) return;
     const rec  = getTodayRecord(currentLookedUpStudent.studentId);
-    const now = getNowMinutes(), CO_OPEN = strToMinutes(timeConfig.coOpen), CO_CLOSE = strToMinutes(timeConfig.coClose);
-    if (rec && rec.status === 'checked_out') { btnCheckout.disabled = true; return; }
-    btnCheckout.disabled = !(rec && rec.status !== 'checked_out' && (devModeActive || (now >= CO_OPEN && now <= CO_CLOSE)) && !!currentCheckinPhoto);
+    if (rec && rec.checkOut) { btnCheckout.disabled = true; return; }
+    btnCheckout.disabled = !(rec && !!currentCheckinPhoto);
 }
 
 function openRemarkModal() { remarkTextarea.value = currentRemark; remarkModal.classList.add('active'); setTimeout(() => remarkTextarea.focus(), 200); }
 function closeRemarkModal() {
     remarkModal.classList.remove('active');
-    if (isCheckingInVeryLate) {
-        isCheckingInVeryLate = false; checkinStudentId.value = ''; currentLookedUpStudent = null;
-        studentInfoCard.classList.add('hidden'); checkinPhotoSection.classList.add('hidden'); checkinPhotoPreviewCon.classList.add('hidden');
-        actionButtons.classList.add('hidden'); remarkSection.classList.add('hidden');
-    }
 }
 function setQuickRemark(text) { remarkTextarea.value = text.slice(0, 5); }
 function saveRemark() {
@@ -336,18 +360,12 @@ function saveRemark() {
     if (val.length > 5) {
         val = val.slice(0, 5);
     }
-    if (isCheckingInVeryLate) {
-        if (!val) { showToast('กรุณาระบุเหตุผลการมาสาย', 'error'); return; }
-        saveAutoCheckinRecord(currentLookedUpStudent, 'verylate', val);
-        isCheckingInVeryLate = false; closeRemarkModal();
-    } else {
-        currentRemark = val; closeRemarkModal(); updateRemarkUI();
-        if (currentLookedUpStudent) {
-            const rec = getTodayRecord(currentLookedUpStudent.studentId);
-            if (rec) { rec.remark = val; localStorage.setItem('attendanceRecords', JSON.stringify(dbAttendance)); filterAttendanceRecords(); }
-        }
-        if (val) showToast('บันทึกหมายเหตุแล้ว ✓', 'success');
+    currentRemark = val; closeRemarkModal(); updateRemarkUI();
+    if (currentLookedUpStudent) {
+        const rec = getTodayRecord(currentLookedUpStudent.studentId);
+        if (rec) { rec.remark = val; localStorage.setItem('attendanceRecords', JSON.stringify(dbAttendance)); filterAttendanceRecords(); }
     }
+    if (val) showToast('บันทึกหมายเหตุแล้ว ✓', 'success');
 }
 function updateRemarkUI() {
     if (currentRemark) { btnOpenRemark.classList.add('has-remark'); remarkIndicator.classList.remove('hidden'); remarkPreviewText.textContent = `"${currentRemark}"`; }
@@ -360,10 +378,10 @@ function updateDashboard() {
     const todayDate = getTodayDateStr();
     document.getElementById('val-total').textContent = dbStudents.length;
     const todayRecords = dbAttendance.filter(r => r.date === todayDate);
-    document.getElementById('val-ontime').textContent = todayRecords.filter(r => r.status === 'ontime').length;
-    document.getElementById('val-late').textContent = todayRecords.filter(r => r.status === 'late').length;
-    document.getElementById('val-verylate').textContent = todayRecords.filter(r => r.status === 'verylate').length;
-    document.getElementById('val-done').textContent = todayRecords.filter(r => r.status === 'checked_out' || r.checkOut).length;
+    document.getElementById('val-checkin').textContent = todayRecords.filter(r => r.checkIn).length;
+    document.getElementById('val-pending').textContent = todayRecords.filter(r => r.checkIn && !r.checkOut).length;
+    document.getElementById('val-done').textContent = todayRecords.filter(r => r.checkIn && r.checkOut).length;
+    document.getElementById('val-late-leave').textContent = todayRecords.filter(r => r.lateLeaveReason).length;
 }
 
 function filterAttendanceRecords() {
@@ -373,7 +391,8 @@ function filterAttendanceRecords() {
     let filtered = dbAttendance;
     if (q) filtered = filtered.filter(r => (r.name && r.name.toLowerCase().includes(q)) || (r.username && r.username.toLowerCase().includes(q)) || r.studentId.toLowerCase().includes(q));
     if (filterDate) filtered = filtered.filter(r => r.date === filterDate);
-    if (filterStatus) filtered = filtered.filter(r => filterStatus === 'checked_out' ? (r.status === 'checked_out' || !!r.checkOut) : r.status === filterStatus);
+    if (filterStatus === 'checked_in') filtered = filtered.filter(r => r.checkIn && !r.checkOut);
+    if (filterStatus === 'checked_out') filtered = filtered.filter(r => r.checkIn && r.checkOut);
     renderAttendanceTable(filtered);
 }
 function filterAttendance() { filterAttendanceRecords(); }
@@ -382,6 +401,13 @@ function formatDisplayDate(dateStr) {
     if (!dateStr || !dateStr.includes('-')) return dateStr || '—';
     const parts = dateStr.split('-');
     return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parseInt(parts[0]) + 543}` : dateStr;
+}
+
+function parseDurationMinutes(duration) {
+    if (!duration || duration === '—') return 0;
+    const hours = Number((duration.match(/(\d+(?:\.\d+)?)\s*ชม/) || [])[1] || 0);
+    const minutes = Number((duration.match(/(\d+)\s*นาที/) || [])[1] || 0);
+    return hours * 60 + minutes;
 }
 
 function renderAttendanceTable(data = dbAttendance) {
@@ -394,11 +420,9 @@ function renderAttendanceTable(data = dbAttendance) {
     data.forEach((rec, i) => {
         const student = dbStudents.find(s => s.studentId === rec.studentId);
         const photo = student ? student.photo : '';
-        let statusClass = 'tbl-pending', displayStatus = 'On Time';
-        if (rec.status === 'checked_out' || rec.checkOut) { statusClass = 'tbl-checkout'; displayStatus = 'Checked Out'; }
-        else if (rec.status === 'verylate') { statusClass = 'tbl-verylate'; displayStatus = 'Very Late'; }
-        else if (rec.status === 'late') { statusClass = 'tbl-late'; displayStatus = 'Late'; }
-        else { statusClass = 'tbl-ontime'; displayStatus = 'On Time'; }
+        const checkedOut = !!rec.checkOut;
+        const statusClass = checkedOut ? 'tbl-checkout' : 'tbl-ontime';
+        const displayStatus = checkedOut ? 'ออกงานแล้ว' : 'ยังไม่ออกงาน';
 
         const durationText = rec.workDuration || '—';
         let remarkCombined = rec.remark || '';
@@ -419,7 +443,7 @@ function renderAttendanceTable(data = dbAttendance) {
             <td><span class="tbl-status ${statusClass}">${displayStatus}</span></td>
             <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:0.78rem" title="${remarkCombined}">${remarkCombined}</td>
             <td><button class="btn-table-photo" onclick="openPhotoModal('${rec.checkInPhoto || ''}', '${rec.name || rec.username}', 'เวลาเข้า: ${rec.checkIn || '—'} น.', 'checkin')">ดูรูปเข้า</button></td>
-            <td><button class="btn-table-photo" onclick="openPhotoModal('${rec.checkOutPhoto || ''}', '${rec.name || rec.username}', 'เวลาออก: ${rec.checkOut || '—'} น.', 'checkout')">ดูรูปออก</button></td>
+            <td><button class="btn-table-photo" onclick="openPhotoModal('${rec.checkOutPhoto || ''}', '${rec.name || rec.username}', 'เวลาออก: ${rec.checkOut || '—'} น.', 'checkout')">ดูรูปออก</button>${rec.lateLeaveAttachment ? ` <button class="btn-table-photo" onclick="openAttachment('${rec.lateLeaveAttachment}', '${rec.name || rec.username}')">ดูเอกสาร</button>` : ''}</td>
             <td style="text-align:center"><button style="background:none;border:none;color:#9fb3c8;cursor:pointer;font-size:1rem;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#9fb3c8'" onclick="deleteAttendance('${rec.id || rec.studentId + '_' + rec.date}')">✕</button></td>
         `;
         attendanceTbody.appendChild(tr);
@@ -433,6 +457,15 @@ function openPhotoModal(photoSrc, username, timeInfo, photoType) {
     document.getElementById('photo-modal-title').textContent = photoType === 'checkin' ? 'รูปลงเวลาเข้า' : 'รูปลงเวลาออก';
     document.getElementById('photo-modal-time').textContent = timeInfo;
     document.getElementById('photo-modal').classList.add('active');
+}
+function openAttachment(attachmentSrc, username) {
+    if (!attachmentSrc) { showToast('ไม่พบเอกสารแนบ', 'warning'); return; }
+    const link = document.createElement('a');
+    link.href = attachmentSrc;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    link.download = `${username || 'late-leave-attachment'}`;
+    link.click();
 }
 function closePhotoModal() { document.getElementById('photo-modal').classList.remove('active'); }
 
@@ -471,10 +504,8 @@ function openStudentHistoryModal() {
         } else {
             const limitedHistory = personalHistory.slice(0, 30);
             limitedHistory.forEach((rec, idx) => {
-                let statusText = 'ตรงเวลา', statusClass = 'tbl-ontime';
-                if (rec.status === 'late') { statusText = 'มาสาย'; statusClass = 'tbl-late'; }
-                else if (rec.status === 'verylate') { statusText = 'สายมาก'; statusClass = 'tbl-verylate'; }
-                else if (rec.status === 'checked_out' || rec.checkOut) { statusText = 'ออกงานแล้ว'; statusClass = 'tbl-checkout'; }
+                const statusText = rec.checkOut ? 'ออกงานแล้ว' : 'ยังไม่ออกงาน';
+                const statusClass = rec.checkOut ? 'tbl-checkout' : 'tbl-ontime';
 
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
@@ -504,25 +535,24 @@ function openIndividualStatsModal(studentId) {
     if (!student) return;
     const data = getStudentStatsAndHistory(studentId);
     const total = data.totalRecords || 1;
-    const pctOnTime = Math.round((data.stats.onTime / total) * 100), pctLate = Math.round((data.stats.late / total) * 100), pctVeryLate = Math.round((data.stats.veryLate / total) * 100);
+    const pctWorked = Math.round((data.stats.worked / total) * 100), pctLateLeave = Math.round((data.stats.lateLeave / total) * 100);
 
     document.getElementById('ind-modal-photo').src = student.photo;
     document.getElementById('ind-modal-name').textContent = student.username;
     document.getElementById('ind-modal-id').textContent = `รหัสนักศึกษา: ${student.studentId}`;
     document.getElementById('ind-total-count').textContent = `${data.totalRecords} ครั้ง`;
 
-    document.getElementById('bar-ontime').style.width = `${pctOnTime}%`; document.getElementById('val-ontime-pct').textContent = `${data.stats.onTime} ครั้ง (${pctOnTime}%)`;
-    document.getElementById('bar-late').style.width = `${pctLate}%`; document.getElementById('val-late-pct').textContent = `${data.stats.late} ครั้ง (${pctLate}%)`;
-    document.getElementById('bar-verylate').style.width = `${pctVeryLate}%`; document.getElementById('val-verylate-pct').textContent = `${data.stats.veryLate} ครั้ง (${pctVeryLate}%)`;
+    document.getElementById('bar-ontime').style.width = `${pctWorked}%`; document.getElementById('val-ontime-pct').textContent = `${data.stats.worked} วันเข้างาน (${pctWorked}%)`;
+    document.getElementById('bar-late').style.width = `${pctLateLeave}%`; document.getElementById('val-late-pct').textContent = `${data.stats.lateLeave} ครั้งออกช้า (${pctLateLeave}%)`;
+    document.getElementById('bar-verylate').style.width = '0%'; document.getElementById('val-verylate-pct').textContent = 'ไม่ใช้สถานะเข้างานสาย';
 
     const tbody = document.getElementById('ind-history-tbody'); tbody.innerHTML = '';
     if (data.history.length === 0) { tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--text-muted)">ยังไม่มีประวัติ</td></tr>`; }
     else {
         data.history.forEach((rec, idx) => {
-            let statusText = 'ตรงเวลา', statusClass = 'tbl-ontime';
-            if (rec.status === 'late') { statusText = 'มาสาย'; statusClass = 'tbl-late'; }
-            else if (rec.status === 'verylate') { statusText = 'สายมาก'; statusClass = 'tbl-verylate'; }
-            else if (rec.status === 'checked_out') { statusText = 'ออกงานแล้ว'; statusClass = 'tbl-checkout'; }
+            let statusText = 'ยังไม่ออกงาน', statusClass = 'tbl-ontime';
+            if (rec.checkOut) { statusText = 'ออกงานแล้ว'; statusClass = 'tbl-checkout'; }
+            else { statusText = 'ยังไม่ออกงาน'; statusClass = 'tbl-ontime'; }
             const tr = document.createElement('tr');
             tr.innerHTML = `<td style="text-align:center">${idx + 1}</td><td>${formatDisplayDate(rec.date)}</td><td style="font-weight:500">${rec.checkIn || '—'} / ${rec.checkOut || '—'}</td><td><span class="tbl-status ${statusClass}">${statusText}</span></td>`;
             tbody.appendChild(tr);
@@ -534,27 +564,19 @@ function closeIndividualModal() { document.body.classList.remove('modal-open'); 
 
 // ── Admin Settings & PIN UI ──
 function loadTimeSettingsUI() {
-    ['cfg-ci-open', 'cfg-ci-ontime', 'cfg-ci-close', 'cfg-co-open', 'cfg-co-close'].forEach(id => {
+    ['cfg-checkout-deadline'].forEach(id => {
         const el = document.getElementById(id);
         if (el) {
-            if(id === 'cfg-ci-open') el.value = timeConfig.ciOpen;
-            if(id === 'cfg-ci-ontime') el.value = timeConfig.ciOntime;
-            if(id === 'cfg-ci-close') el.value = timeConfig.ciClose;
-            if(id === 'cfg-co-open') el.value = timeConfig.coOpen;
-            if(id === 'cfg-co-close') el.value = timeConfig.coClose;
+            el.value = timeConfig.checkoutDeadline || '18:00';
         }
     });
 }
 
 async function saveTimeSettings() {
     if (!isAdminAuthenticated) { openPinModal(); return; }
-    const ciOpen = document.getElementById('cfg-ci-open').value, ciOntime = document.getElementById('cfg-ci-ontime').value, ciClose = document.getElementById('cfg-ci-close').value;
-    const coOpen = document.getElementById('cfg-co-open').value, coClose = document.getElementById('cfg-co-close').value;
-    if (strToMinutes(ciOpen) >= strToMinutes(ciOntime)) { showToast('❌ เวลาเปิดรับเข้างาน ต้องน้อยกว่า เวลาสิ้นสุดตรงเวลา', 'error'); return; }
-    if (strToMinutes(ciOntime) >= strToMinutes(ciClose)) { showToast('❌ เวลาสิ้นสุดตรงเวลา ต้องน้อยกว่า เวลาปิดรับเข้างาน', 'error'); return; }
-    if (strToMinutes(coOpen) >= strToMinutes(coClose)) { showToast('❌ เวลาเปิดออกงานตอนเย็น ต้องน้อยกว่า เวลาปิดรับออกงาน', 'error'); return; }
-
-    timeConfig = { ciOpen, ciOntime, ciClose, coOpen, coClose };
+    const checkoutDeadline = document.getElementById('cfg-checkout-deadline').value;
+    if (!checkoutDeadline) { showToast('กรุณาระบุเดดไลน์ออกงาน', 'error'); return; }
+    timeConfig = { checkoutDeadline };
     try {
         await db.collection('config').doc('settings').set({ timeConfig }, { merge: true });
         localStorage.setItem('timeConfig', JSON.stringify(timeConfig));
@@ -594,6 +616,7 @@ function submitPin() {
         closePinModal();
         if (tabCheckin) tabCheckin.style.display = 'flex';
         if (tabReport) tabReport.style.display = 'flex';
+        if (tabBottomReport) tabBottomReport.style.display = 'flex';
         if (tabRegister) tabRegister.style.display = 'flex';
         if (tabStudentCheckin) tabStudentCheckin.style.display = 'none';
         switchTab(document.getElementById('pin-tab-target').value || 'report');
@@ -614,6 +637,7 @@ function logoutAdmin() {
     const isStudentLoggedIn = !!getStoredStudentAuth();
     if (tabCheckin) tabCheckin.style.display = 'none';
     if (tabReport) tabReport.style.display = 'none';
+    if (tabBottomReport) tabBottomReport.style.display = 'none';
     if (tabRegister) tabRegister.style.display = isStudentLoggedIn ? 'none' : 'flex';
     if (tabStudentCheckin) tabStudentCheckin.style.display = isStudentLoggedIn ? 'flex' : 'none';
     showToast('🔒 ออกจากระบบแอดมินแล้ว', 'info');
@@ -647,10 +671,13 @@ function checkStudentAuth() {
     if (auth && auth.studentId) {
         const localStudents = JSON.parse(localStorage.getItem('students') || '[]');
         const allStudents = dbStudents.length > 0 ? dbStudents : localStudents;
-        if (allStudents.length === 0 || allStudents.some(s => s.studentId === auth.studentId)) {
+        if (allStudents.length > 0 && allStudents.some(s => s.studentId === auth.studentId)) {
             exitStandaloneMode();
             switchTab('home');
             return true;
+        } else {
+            // Student session is invalid (e.g. database was wiped), clear it
+            clearStoredStudentAuth();
         }
     }
     enterStandaloneMode();
@@ -661,8 +688,12 @@ function enterStandaloneMode() {
     document.body.classList.add('standalone-mode');
     if (tabCheckin) tabCheckin.style.display = 'none';
     if (tabReport) tabReport.style.display = 'none';
+    if (tabBottomReport) tabBottomReport.style.display = 'none';
     if (tabRegister) tabRegister.style.display = 'flex';
     if (tabStudentCheckin) tabStudentCheckin.style.display = 'none';
+    // ซ่อน Bottom Nav Bar ทั้งหมดใน standalone mode
+    const bottomNav = document.getElementById('bottom-nav');
+    if (bottomNav) bottomNav.style.display = 'none';
     switchTab('register');
 }
 
@@ -674,19 +705,120 @@ function exitStandaloneMode() {
     if (tabStudentCheckin) {
         tabStudentCheckin.style.display = isAdminAuthenticated ? 'none' : 'flex';
     }
+    if (tabReport) {
+        tabReport.style.display = isAdminAuthenticated ? 'flex' : 'none';
+    }
+    if (tabBottomReport) {
+        tabBottomReport.style.display = isAdminAuthenticated ? 'flex' : 'none';
+    }
+    // คืน Bottom Nav Bar เมื่อ Login แล้ว (mobile จะแสดงอัตโนมัติ desktop หายเพราะ CSS media query)
+    const bottomNav = document.getElementById('bottom-nav');
+    if (bottomNav) bottomNav.style.display = '';
 }
 
 function renderStudentHome() {
     const auth = getStoredStudentAuth();
+    const loginContainer = document.getElementById('student-login-container');
+    const dashboardContainer = document.getElementById('student-dashboard-container');
+
+    console.log('renderStudentHome: auth =', auth);
+    console.log('renderStudentHome: loginContainer =', loginContainer);
+    console.log('renderStudentHome: dashboardContainer =', dashboardContainer);
+
     if (!auth || !auth.studentId) {
-        enterStandaloneMode();
+        if (loginContainer) {
+            loginContainer.classList.remove('hidden');
+            console.log('renderStudentHome: not logged in, loginContainer classes =', loginContainer.className);
+        }
+        if (dashboardContainer) {
+            dashboardContainer.classList.add('hidden');
+            console.log('renderStudentHome: not logged in, dashboardContainer classes =', dashboardContainer.className);
+        }
+        const loginError = document.getElementById('login-error');
+        if (loginError) loginError.classList.add('hidden');
         return;
     }
 
     exitStandaloneMode();
-    if (studentLoginContainer) studentLoginContainer.classList.add('hidden');
-    if (studentDashboardContainer) studentDashboardContainer.classList.remove('hidden');
+    if (loginContainer) {
+        loginContainer.classList.add('hidden');
+        console.log('renderStudentHome: logged in, loginContainer classes =', loginContainer.className);
+    }
+    if (dashboardContainer) {
+        dashboardContainer.classList.remove('hidden');
+        console.log('renderStudentHome: logged in, dashboardContainer classes =', dashboardContainer.className);
+    }
     updateStudentHomeData(auth);
+}
+
+function showRecoveryLogin() {
+    const registerView = document.getElementById('view-register');
+    const homeView = document.getElementById('view-home');
+    const loginContainer = document.getElementById('student-login-container');
+    const dashboardContainer = document.getElementById('student-dashboard-container');
+    const registrationForm = document.getElementById('registration-form');
+    const loginError = document.getElementById('login-error');
+
+    if (registerView) registerView.classList.remove('active');
+    if (homeView) homeView.classList.add('active');
+    if (registrationForm) registrationForm.reset();
+    if (loginError) loginError.classList.add('hidden');
+    if (dashboardContainer) dashboardContainer.classList.add('hidden');
+    if (loginContainer) {
+        loginContainer.classList.remove('hidden');
+        document.getElementById('login-student-id')?.focus();
+    }
+}
+
+function showRegistrationForm() {
+    const registerView = document.getElementById('view-register');
+    const homeView = document.getElementById('view-home');
+    const loginContainer = document.getElementById('student-login-container');
+    const dashboardContainer = document.getElementById('student-dashboard-container');
+    const loginForm = document.getElementById('student-login-form');
+
+    if (loginForm) loginForm.reset();
+    document.getElementById('login-error')?.classList.add('hidden');
+    if (loginContainer) loginContainer.classList.add('hidden');
+    if (dashboardContainer) dashboardContainer.classList.add('hidden');
+    if (homeView) homeView.classList.remove('active');
+    if (registerView) registerView.classList.add('active');
+}
+
+function handleStudentLogin(event) {
+    event.preventDefault();
+    const loginId = document.getElementById('login-student-id').value.trim();
+    const loginPin = document.getElementById('login-student-pin').value.trim();
+    const loginError = document.getElementById('login-error');
+
+    if (!loginId || !loginPin) {
+        showToast('กรุณากรอกข้อมูลให้ครบถ้วน', 'error');
+        return;
+    }
+    if (!/^6\d{8}$/.test(loginId)) {
+        showToast('รหัสนักศึกษาต้องเป็นตัวเลข 9 หลัก และขึ้นต้นด้วย 6', 'error');
+        return;
+    }
+
+    const localStudents = JSON.parse(localStorage.getItem('students') || '[]');
+    const allStudents = dbStudents.length > 0 ? dbStudents : localStudents;
+    const foundStudent = allStudents.find(s => s.studentId === loginId);
+
+    if (foundStudent && foundStudent.pin === loginPin) {
+        const authData = {
+            studentId: foundStudent.studentId,
+            studentName: foundStudent.username,
+            loginAt: Date.now()
+        };
+        setStoredStudentAuth(authData);
+        document.getElementById('student-login-form').reset();
+        if (loginError) loginError.classList.add('hidden');
+        exitStandaloneMode();
+        switchTab('home');
+        showToast(`👋 ยินดีต้อนรับกลับคุณ ${foundStudent.username}`, 'success');
+    } else {
+        if (loginError) loginError.classList.remove('hidden');
+    }
 }
 
 function updateStudentHomeData(auth) {
@@ -717,18 +849,12 @@ function updateStudentHomeData(auth) {
         if (!rec) {
             badge.classList.add('status-none');
             badge.textContent = 'ยังไม่ลงเวลา';
-        } else if (rec.status === 'checked_out' || rec.checkOut) {
+        } else if (rec.checkOut) {
             badge.classList.add('status-checkout');
             badge.textContent = 'ออกงานแล้ว';
-        } else if (rec.status === 'verylate') {
-            badge.classList.add('status-verylate');
-            badge.textContent = 'สายมาก';
-        } else if (rec.status === 'late') {
-            badge.classList.add('status-late');
-            badge.textContent = 'มาสาย';
         } else {
             badge.classList.add('status-ontime');
-            badge.textContent = 'ตรงเวลา';
+            badge.textContent = 'เข้างานแล้ว';
         }
     }
 
@@ -748,23 +874,12 @@ function updateStudentHomeData(auth) {
 
     const monthlyRecords = getStudentMonthlyRecords(auth.studentId, yearMonthPrefix);
 
-    let countOntime = 0;
-    let countLate = 0;
-    let countVeryLate = 0;
-
-    monthlyRecords.forEach(r => {
-        if (r.status === 'late') countLate++;
-        else if (r.status === 'verylate') countVeryLate++;
-        else countOntime++;
-    });
-
-    const valOntime = document.getElementById('shome-month-ontime');
-    const valLate = document.getElementById('shome-month-late');
-    const valVeryLate = document.getElementById('shome-month-verylate');
-
-    if (valOntime) valOntime.textContent = countOntime;
-    if (valLate) valLate.textContent = countLate;
-    if (valVeryLate) valVeryLate.textContent = countVeryLate;
+    const totalDays = document.getElementById('shome-month-days');
+    const totalHours = document.getElementById('shome-month-hours');
+    const lateLeaves = document.getElementById('shome-month-late-leave');
+    if (totalDays) totalDays.textContent = monthlyRecords.length;
+    if (totalHours) totalHours.textContent = monthlyRecords.reduce((sum, r) => sum + (parseDurationMinutes(r.workDuration) / 60), 0).toFixed(1);
+    if (lateLeaves) lateLeaves.textContent = monthlyRecords.filter(r => r.lateLeaveReason).length;
 }
 
 function renderStudentCheckinView() {
@@ -793,7 +908,7 @@ function updateHomeActionButtonStatus(studentId) {
             btn.className = 'btn-home-attendance btn-home-checkin';
             textEl.textContent = 'ลงเวลาเข้า';
             iconEl.innerHTML = '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>';
-        } else if (!rec.checkOut && rec.status !== 'checked_out') {
+        } else if (!rec.checkOut) {
             btn.disabled = false;
             btn.className = 'btn-home-attendance btn-home-checkout';
             textEl.textContent = 'ลงเวลาออก';
@@ -831,13 +946,13 @@ function handleHomeAttendanceAction() {
         openCameraModal('home_checkin');
     }
     // กรณี 2: เข้างานแล้วแต่ยังไม่ออก -> ลงเวลาออก
-    else if (!rec.checkOut && rec.status !== 'checked_out') {
+    else if (!rec.checkOut) {
         currentLookedUpStudent = student;
         const now = new Date();
         const nowMinutes = now.getHours() * 60 + now.getMinutes();
 
         // เช็คเงื่อนไขเวลา 18:00 น. (18 * 60 = 1080)
-        if (nowMinutes > 1080) {
+        if (nowMinutes >= strToMinutes(timeConfig.checkoutDeadline || '18:00')) {
             openLateLeaveModal();
         } else {
             pendingLateLeaveReason = '';
@@ -852,9 +967,26 @@ function handleHomeAttendanceAction() {
 
 function openLateLeaveModal() {
     document.getElementById('late-leave-textarea').value = '';
+    document.getElementById('late-leave-attachment').value = '';
+    pendingLateLeaveAttachment = '';
     document.getElementById('late-leave-error').classList.add('hidden');
     document.getElementById('late-leave-modal').classList.add('active');
     setTimeout(() => document.getElementById('late-leave-textarea').focus(), 200);
+}
+
+function handleLateLeaveAttachment(event) {
+    const file = event.target.files[0];
+    if (!file) { pendingLateLeaveAttachment = ''; return; }
+    if (file.size > 500 * 1024) {
+        event.target.value = '';
+        pendingLateLeaveAttachment = '';
+        showToast('ไฟล์ต้องมีขนาดไม่เกิน 500KB', 'error');
+        return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => { pendingLateLeaveAttachment = reader.result; };
+    reader.onerror = () => { pendingLateLeaveAttachment = ''; showToast('ไม่สามารถอ่านไฟล์แนบได้', 'error'); };
+    reader.readAsDataURL(file);
 }
 
 function setQuickLateReason(text) {
@@ -889,8 +1021,9 @@ async function onHomeCheckoutPhotoCaptured(photoBase64) {
     const auth = getStoredStudentAuth();
     if (!auth) return;
 
-    await saveStudentCheckoutRecord(auth.studentId, photoBase64, pendingLateLeaveReason);
+    await saveStudentCheckoutRecord(auth.studentId, photoBase64, pendingLateLeaveReason, pendingLateLeaveAttachment);
     pendingLateLeaveReason = '';
+    pendingLateLeaveAttachment = '';
     renderStudentHome();
     switchTab('home');
 }
