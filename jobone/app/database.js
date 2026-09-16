@@ -19,21 +19,41 @@ function getGPSLocation() {
             resolve(null);
             return;
         }
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                resolve({ lat: position.coords.latitude, lng: position.coords.longitude });
-            },
+        const positionToLocation = (position) => ({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+        });
+        const messages = {
+            1: 'ไม่ได้รับอนุญาตให้เข้าถึงตำแหน่ง โปรดกด Allow ที่ไอคอนแม่กุญแจข้าง URL',
+            2: 'ไม่พบตำแหน่งปัจจุบัน โปรดเปิด Location/GPS แล้วย้ายไปใกล้หน้าต่างหรือที่โล่งก่อนลองใหม่',
+            3: 'ค้นหาตำแหน่งไม่ทันเวลา โปรดลองใหม่ในบริเวณสัญญาณดี'
+        };
+        const requestPosition = (options, onError) => navigator.geolocation.getCurrentPosition(
+            (position) => resolve(positionToLocation(position)),
+            onError,
+            options
+        );
+
+        // Try GPS first, then fall back to the quicker network/location-provider result.
+        requestPosition(
+            { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 },
             (error) => {
-                const messages = {
-                    1: 'ไม่ได้รับอนุญาตให้เข้าถึงตำแหน่ง โปรดกด Allow ที่ไอคอนแม่กุญแจข้าง URL',
-                    2: 'ไม่พบตำแหน่งปัจจุบัน โปรดเปิด Location/GPS แล้วลองใหม่',
-                    3: 'ค้นหาตำแหน่งไม่ทันเวลา โปรดลองใหม่อีกครั้งในบริเวณสัญญาณดี'
-                };
-                lastGeolocationError = messages[error.code] || 'ไม่สามารถอ่านตำแหน่งปัจจุบันได้';
-                console.warn(lastGeolocationError, error);
-                resolve(null);
-            },
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                if (error.code === 1) {
+                    lastGeolocationError = messages[error.code];
+                    console.warn(lastGeolocationError, error);
+                    resolve(null);
+                    return;
+                }
+                console.warn('High-accuracy location failed; trying standard accuracy:', error);
+                requestPosition(
+                    { enableHighAccuracy: false, timeout: 10000, maximumAge: 120000 },
+                    (fallbackError) => {
+                        lastGeolocationError = messages[fallbackError.code] || messages[error.code] || 'ไม่สามารถอ่านตำแหน่งปัจจุบันได้';
+                        console.warn(lastGeolocationError, fallbackError);
+                        resolve(null);
+                    }
+                );
+            }
         );
     });
 }
@@ -77,6 +97,46 @@ async function syncDataFromFirestore() {
     }
 }
 
+function startRealtimeSync() {
+    if (stopRealtimeSync) return;
+
+    let studentsReady = false;
+    let attendanceReady = false;
+    let errorShown = false;
+    const refreshUI = () => {
+        localStorage.setItem('students', JSON.stringify(dbStudents));
+        localStorage.setItem('attendanceRecords', JSON.stringify(dbAttendance));
+        updateRecordCount();
+        updateDashboard();
+        filterAttendanceRecords();
+    };
+    const handleError = (error) => {
+        console.error('Realtime Firebase sync failed:', error);
+        if (!errorShown) {
+            showToast('⚠️ การอัปเดตแบบเรียลไทม์ขัดข้อง ระบบยังใช้ข้อมูลล่าสุดในเครื่อง', 'warning', 5000);
+            errorShown = true;
+        }
+    };
+
+    const unsubscribeStudents = db.collection('students').onSnapshot(snapshot => {
+        dbStudents = snapshot.docs.map(doc => doc.data());
+        studentsReady = true;
+        refreshUI();
+    }, handleError);
+    const unsubscribeAttendance = db.collection('attendance').onSnapshot(snapshot => {
+        dbAttendance = snapshot.docs.map(doc => ({ ...doc.data(), _docId: doc.id }));
+        attendanceReady = true;
+        refreshUI();
+    }, handleError);
+
+    stopRealtimeSync = () => {
+        unsubscribeStudents();
+        unsubscribeAttendance();
+        stopRealtimeSync = null;
+    };
+    if (studentsReady && attendanceReady) refreshUI();
+}
+
 // 📌 ฟังก์ชันลงทะเบียน
 async function handleRegister(event) {
     event.preventDefault();
@@ -86,7 +146,7 @@ async function handleRegister(event) {
 
     if (!username || !studentId || !pin) { showToast('กรุณากรอกข้อมูลให้ครบถ้วน', 'error'); return; }
     if (!/^6\d{8}$/.test(studentId)) { showToast('รหัสนักศึกษาต้องเป็นตัวเลข 9 หลัก และขึ้นต้นด้วย 6', 'error'); return; }
-    if (pin.length !== 8 || isNaN(pin)) { showToast('กรุณาระบุรหัส PIN เป็นตัวเลข 8 หลัก', 'error'); return; }
+    if (!/^\d{6,13}$/.test(pin)) { showToast('กรุณาระบุรหัส PIN เป็นตัวเลข 6-13 หลัก', 'error'); return; }
     if (!currentPhotoBase64) { showToast('กรุณาถ่ายรูปเพื่อยืนยันตัวตน', 'error'); return; }
     if (dbStudents.some(s => s.studentId === studentId)) { showToast('รหัสนักศึกษานี้ลงทะเบียนไปแล้ว', 'error'); return; }
 

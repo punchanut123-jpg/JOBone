@@ -5,6 +5,7 @@
 // ตัวแปรข้อมูล
 let dbStudents    = [];
 let dbAttendance  = [];
+let stopRealtimeSync = null;
 
 // ตัวแปรสถานะและรูปภาพ
 let currentPhotoBase64      = null;  

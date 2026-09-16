@@ -131,6 +131,11 @@ function handleFallbackFile(event) {
     reader.readAsDataURL(file);
 }
 
+function handleLibraryFile(event) {
+    handleFallbackFile(event);
+    event.target.value = '';
+}
+
 function displayPhotoPreview(src, context) {
     const dom = getCameraDOM();
     if (context === 'register') {

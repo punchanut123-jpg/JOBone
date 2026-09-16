@@ -89,15 +89,15 @@
             <div id="student-login-container" class="mobile-frame hidden">
                 <div class="card-inner">
                     <h1 class="form-title">เข้าสู่ระบบนักศึกษา</h1>
-                    <p class="form-subtitle-desc">กรอกรหัสนักศึกษาและ PIN 8 หลัก เพื่อเข้าสู่ระบบ</p>
+                    <p class="form-subtitle-desc">กรอกรหัสนักศึกษาและ PIN (6-13 หลัก) เพื่อเข้าสู่ระบบ</p>
                     <form id="student-login-form" onsubmit="handleStudentLogin(event)">
                         <div class="form-group">
                             <label for="login-student-id" class="sr-only">รหัสนักศึกษา</label>
                             <input type="text" id="login-student-id" class="form-input" placeholder="กรอกรหัสนักศึกษา 9 หลัก" required autocomplete="off" maxlength="9" pattern="6\d{8}" title="กรุณากรอกรหัสนักศึกษา 9 หลัก ขึ้นต้นด้วย 6">
                         </div>
                         <div class="form-group">
-                            <label for="login-student-pin" class="sr-only">รหัส PIN 8 หลัก</label>
-                            <input type="password" id="login-student-pin" class="form-input" placeholder="กรอกรหัส PIN 8 หลัก" required autocomplete="off" inputmode="numeric" maxlength="8" pattern="\d{8}" title="กรุณากรอกตัวเลข 8 หลัก">
+                            <label for="login-student-pin" class="sr-only">รหัส PIN 6-13 หลัก</label>
+                            <input type="password" id="login-student-pin" class="form-input" placeholder="กรอกรหัส PIN 6-13 หลัก" required autocomplete="off" inputmode="numeric" minlength="6" maxlength="13" pattern="\d{6,13}" title="กรุณากรอกตัวเลข 6-13 หลัก">
                         </div>
                         <div id="login-error" class="pin-error hidden mb-14" role="alert">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
@@ -120,7 +120,10 @@
                             <p id="shome-id" class="student-profile-id">รหัส: -</p>
                         </div>
                     </div>
-                    <div style="display: flex; gap: 8px; align-items: center;">
+                    <div class="student-profile-actions">
+                        <button type="button" class="btn-logout-admin student-logout-btn" onclick="logoutStudent()" title="ออกจากระบบนักศึกษา">
+                            ออกจากระบบ
+                        </button>
                         <button type="button" class="theme-toggle-btn" onclick="toggleTheme()" title="สลับธีม สว่าง/มืด" aria-label="สลับธีม">
                             <svg class="sun-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
                         </button>
@@ -244,8 +247,8 @@
                             <input type="text" id="student-id" class="form-input" placeholder="รหัสนักศึกษา 9 หลัก" required autocomplete="off" maxlength="9" pattern="6\d{8}" title="กรุณากรอกรหัสนักศึกษา 9 หลัก ขึ้นต้นด้วย 6">
                         </div>
                         <div class="form-group">
-                            <label for="student-pin" class="sr-only">รหัส PIN 8 หลัก</label>
-                            <input type="password" id="student-pin" class="form-input" placeholder="กำหนดรหัส PIN 8 หลัก" required autocomplete="off" inputmode="numeric" maxlength="8" pattern="\d{8}" title="กรุณากรอกตัวเลข 8 หลัก">
+                            <label for="student-pin" class="sr-only">รหัส PIN 6-13 หลัก</label>
+                            <input type="password" id="student-pin" class="form-input" placeholder="กำหนดรหัส PIN 6-13 หลัก" required autocomplete="off" inputmode="numeric" minlength="6" maxlength="13" pattern="\d{6,13}" title="กรุณากรอกตัวเลข 6-13 หลัก">
                         </div>
                         <div class="camera-widget" onclick="openCameraModal('register')">
                             <div class="camera-placeholder-circle">
@@ -265,10 +268,10 @@
                                 <button type="button" class="btn-delete-photo hidden" onclick="deletePhoto('register'); event.stopPropagation();">✕</button>
                             </div>
                         </div>
-                        <button type="submit" class="btn-submit">เข้าระบบ</button>
+                        <button type="submit" class="btn-submit">ลงทะเบียน</button>
                         <div class="note-container">
                             <span class="note-title">หมายเหตุ...</span>
-                            <p class="note-desc">กรุณากรอกข้อมูลให้ครบถ้วนและทำการถ่ายภาพเพื่อยืนยันตัวตนก่อนเข้าสู่ระบบ</p>
+                            <p class="note-desc">กรุณากรอกข้อมูลให้ครบถ้วนและเพิ่มภาพถ่ายเพื่อยืนยันตัวตนก่อนลงทะเบียน</p>
                         </div>
                         <div class="admin-login-link-container">
                             <button type="button" class="btn-link-admin recovery-login-link" onclick="showRecoveryLogin()">
@@ -556,6 +559,8 @@
         </div>
         <div class="modal-footer">
             <button id="btn-capture" class="btn-capture-action" onclick="capturePhoto()">ถ่ายภาพ</button>
+            <label for="image-library-input" class="btn-fallback-select">เลือกรูปจากเครื่อง</label>
+            <input type="file" id="image-library-input" accept="image/*" onchange="handleLibraryFile(event)">
         </div>
     </div>
 </div>

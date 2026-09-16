@@ -145,6 +145,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (cloudConnected) {
         showToast('✅ เชื่อมต่อฐานข้อมูล Firebase สำเร็จ', 'success', 3000);
+        startRealtimeSync();
         await migrateLocalDataToCloud();
     } else {
         showToast('❌ ยังไม่ได้เชื่อมต่อกับ Firebase (เปิดใช้โหมดสำรองในเครื่อง)', 'error', 6000);
@@ -388,11 +389,25 @@ function filterAttendanceRecords() {
     const q = searchInput.value.toLowerCase().trim();
     const filterDate = document.getElementById('filter-date').value;
     const filterStatus = document.getElementById('filter-status').value;
-    let filtered = dbAttendance;
+    const reportDate = filterDate || getTodayDateStr();
+    const attendanceStudentIds = new Set(
+        dbAttendance.filter(record => record.date === reportDate).map(record => record.studentId)
+    );
+    const missingStudents = dbStudents
+        .filter(student => !attendanceStudentIds.has(student.studentId))
+        .map(student => ({
+            _noAttendance: true,
+            studentId: student.studentId,
+            name: student.username,
+            username: student.username,
+            date: reportDate
+        }));
+
+    let filtered = [...dbAttendance, ...missingStudents];
     if (q) filtered = filtered.filter(r => (r.name && r.name.toLowerCase().includes(q)) || (r.username && r.username.toLowerCase().includes(q)) || r.studentId.toLowerCase().includes(q));
     if (filterDate) filtered = filtered.filter(r => r.date === filterDate);
-    if (filterStatus === 'checked_in') filtered = filtered.filter(r => r.checkIn && !r.checkOut);
-    if (filterStatus === 'checked_out') filtered = filtered.filter(r => r.checkIn && r.checkOut);
+    if (filterStatus === 'checked_in') filtered = filtered.filter(r => !r._noAttendance && r.checkIn && !r.checkOut);
+    if (filterStatus === 'checked_out') filtered = filtered.filter(r => !r._noAttendance && r.checkIn && r.checkOut);
     renderAttendanceTable(filtered);
 }
 function filterAttendance() { filterAttendanceRecords(); }
@@ -420,9 +435,10 @@ function renderAttendanceTable(data = dbAttendance) {
     data.forEach((rec, i) => {
         const student = dbStudents.find(s => s.studentId === rec.studentId);
         const photo = student ? student.photo : '';
+        const hasNoAttendance = !!rec._noAttendance;
         const checkedOut = !!rec.checkOut;
-        const statusClass = checkedOut ? 'tbl-checkout' : 'tbl-ontime';
-        const displayStatus = checkedOut ? 'ออกงานแล้ว' : 'ยังไม่ออกงาน';
+        const statusClass = hasNoAttendance ? 'tbl-none' : (checkedOut ? 'tbl-checkout' : 'tbl-ontime');
+        const displayStatus = hasNoAttendance ? 'ยังไม่ลงเวลา' : (checkedOut ? 'ออกงานแล้ว' : 'ยังไม่ออกงาน');
 
         const durationText = rec.workDuration || '—';
         let remarkCombined = rec.remark || '';
@@ -442,9 +458,9 @@ function renderAttendanceTable(data = dbAttendance) {
             <td style="font-weight:600; color:var(--accent-color);">${durationText}</td>
             <td><span class="tbl-status ${statusClass}">${displayStatus}</span></td>
             <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:0.78rem" title="${remarkCombined}">${remarkCombined}</td>
-            <td><button class="btn-table-photo" onclick="openPhotoModal('${rec.checkInPhoto || ''}', '${rec.name || rec.username}', 'เวลาเข้า: ${rec.checkIn || '—'} น.', 'checkin')">ดูรูปเข้า</button></td>
-            <td><button class="btn-table-photo" onclick="openPhotoModal('${rec.checkOutPhoto || ''}', '${rec.name || rec.username}', 'เวลาออก: ${rec.checkOut || '—'} น.', 'checkout')">ดูรูปออก</button>${rec.lateLeaveAttachment ? ` <button class="btn-table-photo" onclick="openAttachment('${rec.lateLeaveAttachment}', '${rec.name || rec.username}')">ดูเอกสาร</button>` : ''}</td>
-            <td style="text-align:center"><button style="background:none;border:none;color:#9fb3c8;cursor:pointer;font-size:1rem;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#9fb3c8'" onclick="deleteAttendance('${rec.id || rec.studentId + '_' + rec.date}')">✕</button></td>
+            <td>${hasNoAttendance ? '—' : `<button class="btn-table-photo" onclick="openPhotoModal('${rec.checkInPhoto || ''}', '${rec.name || rec.username}', 'เวลาเข้า: ${rec.checkIn || '—'} น.', 'checkin')">ดูรูปเข้า</button>`}</td>
+            <td>${hasNoAttendance ? '—' : `<button class="btn-table-photo" onclick="openPhotoModal('${rec.checkOutPhoto || ''}', '${rec.name || rec.username}', 'เวลาออก: ${rec.checkOut || '—'} น.', 'checkout')">ดูรูปออก</button>${rec.lateLeaveAttachment ? ` <button class="btn-table-photo" onclick="openAttachment('${rec.lateLeaveAttachment}', '${rec.name || rec.username}')">ดูเอกสาร</button>` : ''}`}</td>
+            <td style="text-align:center">${hasNoAttendance ? '—' : `<button style="background:none;border:none;color:#9fb3c8;cursor:pointer;font-size:1rem;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#9fb3c8'" onclick="deleteAttendance('${rec.id || rec.studentId + '_' + rec.date}')">✕</button>`}</td>
         `;
         attendanceTbody.appendChild(tr);
     });
@@ -619,6 +635,7 @@ function submitPin() {
         if (tabBottomReport) tabBottomReport.style.display = 'flex';
         if (tabRegister) tabRegister.style.display = 'flex';
         if (tabStudentCheckin) tabStudentCheckin.style.display = 'none';
+        exitStandaloneMode();
         switchTab(document.getElementById('pin-tab-target').value || 'report');
     } else {
         const modalContent = document.querySelector('.pin-modal-content');
@@ -642,6 +659,11 @@ function logoutAdmin() {
     if (tabStudentCheckin) tabStudentCheckin.style.display = isStudentLoggedIn ? 'flex' : 'none';
     showToast('🔒 ออกจากระบบแอดมินแล้ว', 'info');
     checkStudentAuth();
+}
+function logoutStudent() {
+    clearStoredStudentAuth();
+    showToast('🔒 ออกจากระบบนักศึกษาแล้ว', 'info');
+    enterStandaloneMode();
 }
 function appendPin(digit) {
     const input = document.getElementById('pin-input');
